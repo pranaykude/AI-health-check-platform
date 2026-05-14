@@ -12,8 +12,11 @@ const errorHandler = require('./middleware/errorHandler');
 const apiLimiter = require('./middleware/rateLimiter');
 const mongoSanitize = require('express-mongo-sanitize');
 const xss = require('xss-clean');
+const cookieParser = require('cookie-parser');
 const logger = require('./utils/logger');
 const { sendSuccess, sendError } = require('./utils/response');
+
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
@@ -30,6 +33,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 app.use(morgan('dev'));
 
 // Data Sanitization against NoSQL Query Injection
@@ -54,6 +58,7 @@ app.use('/api/v1/clients', clientRoutes);
 app.use('/api/v1/calls', callRoutes);
 app.use('/api/v1/jobs', jobRoutes);
 app.use('/api/v1/test-ai', testAIRoute);
+app.use('/api/auth', authRoutes);
 app.get('/api/v1/metrics', jobController.getMetrics);
 
 // Compatibility route for Frontend Dashboard health checks

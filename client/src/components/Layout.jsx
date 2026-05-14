@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import useAuth from '../hooks/useAuth';
 
 const navItems = [
   {
@@ -40,6 +41,8 @@ const navItems = [
 ];
 
 export default function Layout() {
+  const { logout } = useAuth();
+
   return (
     <div className="flex h-screen overflow-hidden bg-bg-primary">
       {/* Sidebar */}
@@ -83,12 +86,21 @@ export default function Layout() {
           ))}
         </nav>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-border-primary">
-          <div className="px-4 py-3 rounded-lg bg-bg-secondary">
-            <p className="text-sm font-medium text-text-primary">Module 3</p>
+        <div className="px-6 py-4 border-t border-border-primary space-y-3">
+          <div className="px-4 py-3 rounded-xl bg-bg-secondary border border-border-primary">
+            <p className="text-sm font-bold text-text-primary">Module 3</p>
             <p className="text-xs text-text-tertiary mt-0.5">Telephony Integration v3.0.0</p>
           </div>
+          
+          <button 
+            onClick={logout}
+            className="w-full px-4 py-3 rounded-xl bg-danger-50 text-danger-600 font-bold hover:bg-danger-100 transition-all flex items-center justify-center gap-2 border border-danger-100 active:scale-95 shadow-sm"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Logout
+          </button>
         </div>
       </aside>
 
