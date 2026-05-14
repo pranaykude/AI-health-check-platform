@@ -1,0 +1,4 @@
+Customer name,Phone,Customer Type,status,Update/Status,Email Sent
+Rahul,+911234567890,Individual,Live,Called today,Yes
+Amit,9876543210,Enterprise,Inactive,Waiting for response,No
+Priya,,Individual,Live,Missing phone,Yes

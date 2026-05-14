@@ -1,0 +1,6 @@
+Customer name,Phone,Customer Type,status,Update/Status,Email Sent
+Rahul,+911234567890,Individual,Live,Valid,Yes
+Invalid Name,,Individual,Live,Missing phone,Yes
+,9876543210,Enterprise,Inactive,Missing name,No
+Short Phone,123,Individual,Live,Short phone,Yes
+Long Phone,1234567890123456,Individual,Live,Long phone,Yes

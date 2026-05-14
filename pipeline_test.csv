@@ -1,0 +1,7 @@
+Customer name,Phone,Customer Type,status,Update/Status,Email Sent
+Pipeline New 1,+911111111111,Individual,Live,New valid,Yes
+Pipeline New 2,+912222222222,Enterprise,Live,New valid,Yes
+pramay,+91 7276087504,Individual,Live,Existing duplicate,Yes
+Invalid Row,,Individual,Live,Missing phone,Yes
+,9876543210,Enterprise,Inactive,Missing name,No
+Duplicate in Batch,+911111111111,Individual,Live,Internal duplicate,Yes
