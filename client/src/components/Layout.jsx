@@ -50,10 +50,12 @@ export default function Layout() {
         {/* Logo */}
         <div className="px-8 py-6 border-b border-border-primary">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-md">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
+            <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center shadow-md">
+              <img 
+                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTR1QYVDNDThbfYGmujAjzdFQv1ag3BxUxqig&s" 
+                alt="HealthCheck Logo" 
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
               <h1 className="text-xl font-bold text-text-primary tracking-tight">HealthCheck</h1>
@@ -86,15 +88,16 @@ export default function Layout() {
           ))}
         </nav>
 
+        {/* Footer */}
         <div className="px-6 py-4 border-t border-border-primary space-y-3">
-          <div className="px-4 py-3 rounded-xl bg-bg-secondary border border-border-primary">
-            <p className="text-sm font-bold text-text-primary">Module 3</p>
+          <div className="px-4 py-3 rounded-lg bg-bg-secondary">
+            <p className="text-sm font-medium text-text-primary">Module 3</p>
             <p className="text-xs text-text-tertiary mt-0.5">Telephony Integration v3.0.0</p>
           </div>
           
           <button 
             onClick={logout}
-            className="w-full px-4 py-3 rounded-xl bg-danger-50 text-danger-600 font-bold hover:bg-danger-100 transition-all flex items-center justify-center gap-2 border border-danger-100 active:scale-95 shadow-sm"
+            className="w-full px-4 py-3 rounded-xl bg-red-50 text-red-600 font-bold hover:bg-red-100 transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95 border border-red-100"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

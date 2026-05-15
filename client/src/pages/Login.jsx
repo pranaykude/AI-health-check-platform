@@ -32,10 +32,12 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-bg-primary px-4">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 space-y-8 animate-scale-in">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg mb-6">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-            </svg>
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl overflow-hidden shadow-lg mb-6 bg-white border border-gray-100">
+            <img 
+              src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTR1QYVDNDThbfYGmujAjzdFQv1ag3BxUxqig&s" 
+              alt="HealthCheck Logo" 
+              className="w-full h-full object-cover"
+            />
           </div>
           <h2 className="text-3xl font-black text-text-primary">Welcome Back</h2>
           <p className="text-text-tertiary mt-2 font-medium">Enter your email to receive a login OTP</p>
@@ -66,7 +68,8 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex justify-center items-center py-4 px-6 rounded-2xl text-white font-bold bg-text-primary hover:bg-black transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+            className="w-full flex justify-center items-center py-4 px-6 rounded-2xl text-white font-bold bg-text-primary hover:bg-black transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-lg border-none"
+            style={{ color: '#FFFFFF' }}
           >
             {loading ? (
               <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
