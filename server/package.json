@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "tunnel": "node src/scripts/tunnel.js"
+    "tunnel": "node src/scripts/tunnel.js",
+    "dev:full": "node src/scripts/tunnel.js"
   },
   "dependencies": {
     "@deepgram/sdk": "^5.0.0",

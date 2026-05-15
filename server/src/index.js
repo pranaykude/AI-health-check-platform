@@ -3,6 +3,7 @@ console.log("[SAFE MODE] No DB mutation mode enabled");
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const clientRoutes = require('./routes/clientRoutes');
 const callRoutes = require('./routes/callRoutes');
@@ -45,9 +46,32 @@ app.use(xss());
 // Apply rate limiting to all API routes
 app.use('/api', apiLimiter);
 
+// Ngrok Warning Bypass Middleware & Infrastructure Headers
+app.use((req, res, next) => {
+  res.setHeader('ngrok-skip-browser-warning', 'true');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  next();
+});
+
 // Health check route
-app.get('/api/v1/health', (req, res) => {
-  sendSuccess(res, { timestamp: new Date().toISOString() }, 'Health Check API is running (v1)');
+app.get('/api/v1/health', async (req, res) => {
+  const healthStatus = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    infrastructure: {
+      public_url: process.env.PUBLIC_URL || 'not_set',
+      node_env: process.env.NODE_ENV,
+      port: PORT
+    },
+    services: {
+      mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+      twilio: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
+      openai: !!process.env.OPENAI_API_KEY,
+      elevenlabs: !!process.env.ELEVENLABS_API_KEY
+    }
+  };
+  
+  sendSuccess(res, healthStatus, 'AI Voice Platform Health Status');
 });
 
 
