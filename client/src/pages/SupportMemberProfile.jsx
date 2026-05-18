@@ -18,6 +18,9 @@ export default function SupportMemberProfile() {
   const [clientCalls, setClientCalls] = useState([]);
   const [selectedCallDetails, setSelectedCallDetails] = useState(null);
 
+  // Left column active navigation toggle (clients or activity)
+  const [activeLeftTab, setActiveLeftTab] = useState('clients');
+
   // Active Tab inside Client Context Panel (summary, transcripts, escalations, chat, notes, emails)
   const [activeTab, setActiveTab] = useState('summary');
 
@@ -45,13 +48,17 @@ export default function SupportMemberProfile() {
   const [generatingDraft, setGeneratingDraft] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
 
+  // Real-time toast notifications (Phase 6 - Step 1)
+  const [toasts, setToasts] = useState([]);
+  const [persistentNotifications, setPersistentNotifications] = useState([]);
+
   const messageEndRef = useRef(null);
 
   useEffect(() => {
     fetchMemberData();
   }, [id]);
 
-  // Connect to real-time websocket coordination gateway on load
+  // Connect to real-time websocket coordination gateway on load with secure handshakes
   useEffect(() => {
     if (!member) return;
 
@@ -62,7 +69,7 @@ export default function SupportMemberProfile() {
     });
 
     newSocket.on('connect', () => {
-      console.log('[SOCKET] Webchat gateway link established');
+      console.log('[SOCKET] Webchat gateway link established securely');
       newSocket.emit('auth', { supportMemberId: member._id });
     });
 
@@ -85,6 +92,19 @@ export default function SupportMemberProfile() {
       if (member && member._id === supportMemberId) {
         setMember(prev => ({ ...prev, status }));
       }
+    });
+
+    // Real-time Push Notification alerts listener (Phase 6 - Step 1)
+    newSocket.on('notification', (notif) => {
+      setPersistentNotifications(prev => [notif, ...prev]);
+
+      const toastId = Date.now();
+      setToasts(prev => [...prev, { ...notif, toastId }]);
+
+      // Auto dismiss sliding toaster after 6 seconds
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.toastId !== toastId));
+      }, 6000);
     });
 
     setSocket(newSocket);
@@ -111,6 +131,14 @@ export default function SupportMemberProfile() {
       const callsRes = await callApi.getCallHistory(1, '', 200);
       const callsList = callsRes.data?.calls || [];
       setAllCalls(callsList);
+
+      // 4. Fetch persistent notifications logs history
+      try {
+        const notifRes = await chatApi.getNotifications();
+        setPersistentNotifications(notifRes.data || []);
+      } catch (err) {
+        console.error('Failed loading persistent notifications', err);
+      }
 
       // Auto-select first client if available
       if (clientsList.length > 0) {
@@ -282,6 +310,18 @@ export default function SupportMemberProfile() {
     }
   };
 
+  // Mark notification read (Phase 6 - Step 2)
+  const handleMarkNotificationRead = async (notifId) => {
+    try {
+      await chatApi.markNotificationRead(notifId);
+      setPersistentNotifications(prev =>
+        prev.map(n => n._id === notifId ? { ...n, read: true } : n)
+      );
+    } catch (err) {
+      console.error('Failed to mark read', err);
+    }
+  };
+
   const scrollToBottom = () => {
     setTimeout(() => {
       messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -422,7 +462,36 @@ export default function SupportMemberProfile() {
   }
 
   return (
-    <div className="p-8 space-y-8 animate-fade-in max-w-7xl mx-auto">
+    <div className="p-8 space-y-8 animate-fade-in max-w-7xl mx-auto relative">
+      
+      {/* Real-Time Floating Toaster System (Phase 6 - Step 1) */}
+      <div className="fixed bottom-6 right-6 z-50 space-y-3 max-w-sm w-full">
+        {toasts.map((toast) => (
+          <div
+            key={toast.toastId}
+            className="bg-slate-900/95 backdrop-blur-md text-white border border-slate-800 p-4 rounded-2xl shadow-2xl flex flex-col gap-1.5 animate-slide-in relative overflow-hidden transition-all duration-300"
+          >
+            <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary-500"></div>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h5 className="text-[10px] font-black tracking-wider text-primary-400 uppercase">
+                  {toast.title}
+                </h5>
+                <p className="text-xs font-semibold text-slate-200 mt-1 leading-relaxed">
+                  {toast.message}
+                </p>
+              </div>
+              <button
+                onClick={() => setToasts(prev => prev.filter(t => t.toastId !== toast.toastId))}
+                className="text-slate-400 hover:text-white font-bold p-1 leading-none text-sm transition-colors cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Back button */}
       <div>
         <Link to="/support-team" className="flex items-center gap-1.5 text-text-tertiary hover:text-text-primary font-bold text-sm transition-all group">
@@ -507,49 +576,125 @@ export default function SupportMemberProfile() {
 
       {/* Split Workspace View */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left column: Active directory list */}
+        {/* Left column: Directory + Operations Toggle */}
         <div className="lg:col-span-4 bg-white border border-border-primary rounded-3xl p-5 shadow-sm space-y-4">
-          <h2 className="text-lg font-bold text-text-primary border-b border-border-primary pb-3">
-            Corporate Client Directory ({assignedClients.length})
-          </h2>
-          {assignedClients.length === 0 ? (
-            <div className="py-12 text-center text-text-tertiary space-y-2">
-              <svg className="w-12 h-12 mx-auto text-text-tertiary opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              <h5 className="font-bold text-text-secondary text-sm">No clients assigned</h5>
-              <p className="text-xs">Use the support workspace to assign corporate clients to this agent.</p>
+          
+          {/* Navigation Toggle for Left Column */}
+          <div className="flex bg-bg-secondary p-1 rounded-2xl border border-border-primary">
+            <button
+              onClick={() => setActiveLeftTab('clients')}
+              className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-200 cursor-pointer ${
+                activeLeftTab === 'clients'
+                  ? 'bg-white text-primary-700 shadow-sm border border-border-primary'
+                  : 'text-text-tertiary hover:text-text-secondary'
+              }`}
+            >
+              Clients
+            </button>
+            <button
+              onClick={() => setActiveLeftTab('activity')}
+              className={`flex-1 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all duration-200 cursor-pointer ${
+                activeLeftTab === 'activity'
+                  ? 'bg-white text-primary-700 shadow-sm border border-border-primary'
+                  : 'text-text-tertiary hover:text-text-secondary'
+              }`}
+            >
+              Live Operations Feed
+            </button>
+          </div>
+
+          {/* Render Active Left Tab contents */}
+          {activeLeftTab === 'clients' ? (
+            <div className="space-y-2">
+              <h3 className="text-xs font-black text-text-tertiary uppercase tracking-wider px-1">
+                Assigned Clients Directory ({assignedClients.length})
+              </h3>
+              {assignedClients.length === 0 ? (
+                <div className="py-12 text-center text-text-tertiary space-y-2">
+                  <svg className="w-12 h-12 mx-auto text-text-tertiary opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <h5 className="font-bold text-text-secondary text-sm">No clients assigned</h5>
+                  <p className="text-xs">Use the support workspace to assign corporate clients to this agent.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                  {assignedClients.map((client) => {
+                    const isSelected = selectedClient?._id === client._id;
+                    return (
+                      <div
+                        key={client._id}
+                        onClick={() => handleSelectClient(client)}
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer flex justify-between items-center group ${
+                          isSelected 
+                            ? 'bg-primary-50/50 border-primary-300 shadow-sm' 
+                            : 'bg-white border-border-primary hover:border-primary-200'
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <h4 className={`text-sm font-bold text-text-primary truncate ${isSelected ? 'text-primary-700' : ''}`}>
+                            {client.name}
+                          </h4>
+                          <p className="text-xs text-text-tertiary font-semibold truncate mt-0.5">
+                            📦 {client.product || 'Enterprise Care'}
+                          </p>
+                        </div>
+                        <svg className={`w-4 h-4 text-text-tertiary transition-transform duration-200 ${
+                          isSelected ? 'text-primary-600 translate-x-1' : 'group-hover:translate-x-1'
+                        }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ) : (
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-              {assignedClients.map((client) => {
-                const isSelected = selectedClient?._id === client._id;
-                return (
-                  <div
-                    key={client._id}
-                    onClick={() => handleSelectClient(client)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex justify-between items-center group ${
-                      isSelected 
-                        ? 'bg-primary-50/50 border-primary-300 shadow-sm' 
-                        : 'bg-white border-border-primary hover:border-primary-200'
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <h4 className={`text-sm font-bold text-text-primary truncate ${isSelected ? 'text-primary-700' : ''}`}>
-                        {client.name}
-                      </h4>
-                      <p className="text-xs text-text-tertiary font-semibold truncate mt-0.5">
-                        📦 {client.product || 'Enterprise Care'}
-                      </p>
-                    </div>
-                    <svg className={`w-4 h-4 text-text-tertiary transition-transform duration-200 ${
-                      isSelected ? 'text-primary-600 translate-x-1' : 'group-hover:translate-x-1'
-                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                    </svg>
+            /* Live Operational Activity Feed (Phase 6 - Step 2) */
+            <div className="space-y-3">
+              <h3 className="text-xs font-black text-text-tertiary uppercase tracking-wider px-1">
+                Real-Time Operations ({persistentNotifications.length})
+              </h3>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                {persistentNotifications.length === 0 ? (
+                  <div className="py-12 text-center text-text-tertiary italic text-xs">
+                    No operational activities recorded yet.
                   </div>
-                );
-              })}
+                ) : (
+                  persistentNotifications.map((notif) => (
+                    <div
+                      key={notif._id}
+                      className={`p-3.5 rounded-2xl border transition-all text-xs font-semibold relative overflow-hidden ${
+                        notif.read 
+                          ? 'bg-white border-border-primary opacity-65' 
+                          : 'bg-primary-50/40 border-primary-100 shadow-sm'
+                      }`}
+                    >
+                      {!notif.read && (
+                        <span className="absolute top-3.5 right-3.5 w-2 h-2 bg-primary-600 rounded-full animate-pulse"></span>
+                      )}
+                      <h5 className="font-black text-text-primary uppercase tracking-tight text-[10px] flex items-center gap-1.5">
+                        <span>●</span> {notif.title}
+                      </h5>
+                      <p className="text-text-secondary text-[11px] mt-1 leading-relaxed font-semibold">
+                        {notif.message}
+                      </p>
+                      <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border-primary/50 text-[9px] text-text-tertiary">
+                        <span>{new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        {!notif.read && (
+                          <button
+                            onClick={() => handleMarkNotificationRead(notif._id)}
+                            className="text-primary-600 hover:text-primary-700 font-bold hover:underline cursor-pointer"
+                          >
+                            Mark Read
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -571,11 +716,11 @@ export default function SupportMemberProfile() {
               <div>
                 {/* AI Alerts Header Panel (Phase 4 - Step 1) */}
                 {aiAlerts.length > 0 && (
-                  <div className="space-y-2 mb-6">
+                  <div className="space-y-2 mb-6 animate-pulse">
                     {aiAlerts.map((alert, idx) => (
                       <div
                         key={idx}
-                        className={`px-4 py-3 rounded-2xl border text-xs font-bold flex items-center justify-between shadow-sm animate-pulse ${
+                        className={`px-4 py-3 rounded-2xl border text-xs font-bold flex items-center justify-between shadow-sm ${
                           alert.type === 'danger'
                             ? 'bg-danger-50 border-danger-100 text-danger-700'
                             : 'bg-warning-50 border-warning-100 text-warning-700'
@@ -615,7 +760,7 @@ export default function SupportMemberProfile() {
                       <span>🤖</span> AI Diagnostic Assistant
                     </h3>
                     <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase border ${
-                      aiDiag.churnRisk === 'High' ? 'bg-danger-50 border-danger-100 text-danger-700' :
+                      aiDiag.churnRisk === 'High' ? 'bg-danger-50 border-danger-100 text-danger-700 animate-pulse' :
                       aiDiag.churnRisk === 'Medium' ? 'bg-warning-50 border-warning-100 text-warning-700' :
                       'bg-success-50 border-success-100 text-success-700'
                     }`}>
@@ -720,7 +865,7 @@ export default function SupportMemberProfile() {
                                 </div>
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase border ${
                                   call.sentiment?.toLowerCase() === 'positive' ? 'bg-success-50 border-success-100 text-success-700' :
-                                  call.sentiment?.toLowerCase() === 'negative' ? 'bg-danger-50 border-danger-100 text-danger-700' :
+                                  call.sentiment?.toLowerCase() === 'negative' ? 'bg-danger-50 border-danger-100 text-danger-700 animate-pulse' :
                                   'bg-slate-50 border-slate-100 text-slate-700'
                                 }`}>
                                   {call.sentiment || 'neutral'}
@@ -1023,7 +1168,7 @@ export default function SupportMemberProfile() {
                     </div>
                   )}
 
-                  {/* TAB 5: EMAIL SUCCESS DESK (Phase 5 - Step 1, 2, 3) */}
+                  {/* TAB 5: EMAIL SUCCESS DESK */}
                   {activeTab === 'emails' && (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                       {/* Left: Email Composer Form */}
@@ -1126,7 +1271,7 @@ export default function SupportMemberProfile() {
                                   </span>
                                   <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase border ${
                                     email.deliveryStatus === 'delivered' ? 'bg-success-50 border-success-100 text-success-700' :
-                                    email.deliveryStatus === 'failed' ? 'bg-danger-50 border-danger-100 text-danger-700' :
+                                    email.deliveryStatus === 'failed' ? 'bg-danger-50 border-danger-100 text-danger-700 animate-pulse' :
                                     'bg-slate-50 border-slate-100 text-slate-700'
                                   }`}>
                                     {email.deliveryStatus}

@@ -21,4 +21,8 @@ router.post('/ai/draft-email', protect, chatController.generateAiDraft);
 router.post('/emails/:clientId', protect, chatController.sendClientEmail);
 router.get('/emails/:clientId', protect, chatController.getEmailHistory);
 
+// 5. Real-Time Notifications & Operation Logs Routing (Phase 6)
+router.get('/notifications', protect, chatController.getNotifications);
+router.post('/notifications/:id/read', protect, chatController.markNotificationRead);
+
 module.exports = router;

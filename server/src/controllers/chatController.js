@@ -4,10 +4,12 @@ const InternalNote = require('../models/InternalNote');
 const SupportMember = require('../models/SupportMember');
 const Client = require('../models/Client');
 const EmailLog = require('../models/EmailLog');
+const Notification = require('../models/Notification');
 const { sendSuccess, sendError } = require('../utils/response');
 const aiService = require('../services/aiService');
 const logger = require('../utils/logger');
 const nodemailer = require('nodemailer');
+const socketService = require('../services/socketService');
 
 /**
  * Helper to resolve authenticated support member context
@@ -15,6 +17,28 @@ const nodemailer = require('nodemailer');
 const resolveAgent = async (req) => {
   if (!req.user || !req.user.email) return null;
   return await SupportMember.findOne({ email: req.user.email });
+};
+
+/**
+ * Global helper to create and push real-time alerts (Phase 6 - Step 1)
+ */
+exports.createNotification = async (supportMemberId, title, message, type, clientReference = null) => {
+  try {
+    const notification = await Notification.create({
+      supportMemberId,
+      title,
+      message,
+      type: type || 'general',
+      clientReference
+    });
+
+    // Push real-time alert via websocket coordinator
+    socketService.sendNotification(supportMemberId, notification);
+    return notification;
+  } catch (err) {
+    logger.error(`[NOTIFICATION HELPER ERROR] ${err.message}`);
+    return null;
+  }
 };
 
 /**
@@ -189,6 +213,17 @@ exports.createInternalNote = async (req, res) => {
       type: type || 'general'
     });
 
+    const client = await Client.findById(clientId);
+
+    // Dynamic Alert/Notification Trigger (Phase 6 - Step 1)
+    await exports.createNotification(
+      agent._id,
+      'New Private Note Recorded',
+      `Internal private remarks logged under client account: ${client ? client.name : 'Unknown Client'}.`,
+      'general',
+      clientId
+    );
+
     const populatedNote = await InternalNote.findById(newNote._id).populate('author', 'fullName avatar role designation');
 
     return sendSuccess(res, populatedNote, 'Secure private note saved');
@@ -340,6 +375,17 @@ exports.sendClientEmail = async (req, res) => {
       deliveryStatus: status
     });
 
+    const client = await Client.findById(clientId);
+
+    // Dynamic Alert/Notification Trigger (Phase 6 - Step 1)
+    await exports.createNotification(
+      agent._id,
+      'Outbound Email Logged',
+      `Outbound professional success email dispatched to: ${recipientEmail} (${status}).`,
+      'general',
+      clientId
+    );
+
     const populatedLog = await EmailLog.findById(log._id).populate('senderId', 'fullName role designation');
 
     return sendSuccess(res, populatedLog, status === 'delivered' ? 'Email delivered successfully' : 'Email logged but transmission failed');
@@ -362,5 +408,45 @@ exports.getEmailHistory = async (req, res) => {
     return sendSuccess(res, history, 'Email communications log retrieved');
   } catch (err) {
     return sendError(res, err.message || 'Error fetching email logs history', 500);
+  }
+};
+
+/**
+ * Get active user notifications (Phase 6 & 8 - Step 2 API Optimization)
+ * GET /api/v1/chat/notifications
+ */
+exports.getNotifications = async (req, res) => {
+  try {
+    const agent = await resolveAgent(req);
+    if (!agent) {
+      return sendError(res, 'Specialist agent session mismatch', 400);
+    }
+
+    // Lazy load constraint - return maximum 25 items for speed optimization
+    const notifications = await Notification.find({ supportMemberId: agent._id })
+      .populate('clientReference', 'name product')
+      .sort({ createdAt: -1 })
+      .limit(25);
+
+    return sendSuccess(res, notifications, 'Real-time alert notifications retrieved');
+  } catch (err) {
+    return sendError(res, err.message || 'Error loading agent notifications', 500);
+  }
+};
+
+/**
+ * Mark Notification as read
+ * POST /api/v1/chat/notifications/:id/read
+ */
+exports.markNotificationRead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const notification = await Notification.findByIdAndUpdate(id, { read: true }, { new: true });
+    if (!notification) {
+      return sendError(res, 'Notification alert not found', 404);
+    }
+    return sendSuccess(res, notification, 'Notification marked as read');
+  } catch (err) {
+    return sendError(res, err.message || 'Error updating read indicators', 500);
   }
 };

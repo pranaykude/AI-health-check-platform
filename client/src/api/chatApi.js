@@ -63,3 +63,12 @@ export const sendClientEmail = (clientId, data) => {
 export const getEmailHistory = (clientId) => {
   return api.get(`/emails/${clientId}`);
 };
+
+// 5. Notifications & Operation Logs REST APIs (Phase 6)
+export const getNotifications = () => {
+  return api.get('/notifications');
+};
+
+export const markNotificationRead = (id) => {
+  return api.post(`/notifications/${id}/read`);
+};
