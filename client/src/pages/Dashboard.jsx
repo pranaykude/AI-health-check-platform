@@ -27,6 +27,17 @@ function AnimatedCounter({ value, duration = 1000 }) {
 }
 
 export default function Dashboard() {
+  const [theme, setTheme] = useState(() => {
+    return document.documentElement.getAttribute('data-theme') || 'light';
+  });
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    localStorage.setItem('theme', nextTheme);
+  };
+
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -100,10 +111,41 @@ export default function Dashboard() {
   return (
     <div className="p-8 lg:p-10 animate-fade-in bg-bg-primary min-h-full">
       {/* Header */}
-      <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+      <div className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-4xl font-bold text-text-primary tracking-tight uppercase italic">Dashboard</h1>
           <p className="text-lg text-text-secondary mt-2">Real-time overview of your AI telephony platform</p>
+        </div>
+        <div>
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-3 bg-bg-secondary border border-border-primary rounded-full px-4 py-2 hover:bg-bg-tertiary transition-all shadow-sm cursor-pointer select-none"
+            aria-label="Toggle dark/light theme"
+          >
+            {theme === 'light' ? (
+              // Moon icon + label for light mode
+              <>
+                <svg className="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+                <span className="w-9 h-5 bg-border-secondary rounded-full relative p-0.5 flex items-center transition-colors duration-300">
+                  <span className="w-4 h-4 bg-primary-500 rounded-full shadow-sm transform transition-transform duration-300 translate-x-0" />
+                </span>
+                <span className="text-xs font-bold text-text-secondary">Light mode</span>
+              </>
+            ) : (
+              // Sun icon + label for dark mode
+              <>
+                <svg className="w-4 h-4 text-warning-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span className="w-9 h-5 bg-border-secondary rounded-full relative p-0.5 flex items-center transition-colors duration-300">
+                  <span className="w-4 h-4 bg-primary-500 rounded-full shadow-sm transform transition-transform duration-300 translate-x-4" />
+                </span>
+                <span className="text-xs font-bold text-text-secondary">Dark mode</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
