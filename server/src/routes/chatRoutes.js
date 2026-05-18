@@ -16,4 +16,9 @@ router.post('/messages/:conversationId/read', protect, chatController.markRead);
 router.get('/internal-notes/:clientId', protect, chatController.getInternalNotes);
 router.post('/internal-notes/:clientId', protect, chatController.createInternalNote);
 
+// 4. AI-Integrated Intelligence & Emails Routing (Phase 4 & 5)
+router.post('/ai/draft-email', protect, chatController.generateAiDraft);
+router.post('/emails/:clientId', protect, chatController.sendClientEmail);
+router.get('/emails/:clientId', protect, chatController.getEmailHistory);
+
 module.exports = router;

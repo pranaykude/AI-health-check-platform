@@ -18,10 +18,10 @@ export default function SupportMemberProfile() {
   const [clientCalls, setClientCalls] = useState([]);
   const [selectedCallDetails, setSelectedCallDetails] = useState(null);
 
-  // Active Tab inside Client Context Panel (summary, transcripts, escalations, chat, notes)
+  // Active Tab inside Client Context Panel (summary, transcripts, escalations, chat, notes, emails)
   const [activeTab, setActiveTab] = useState('summary');
 
-  // Real-Time Socket/Chat States (Step 1, 3, 4)
+  // Real-Time Socket/Chat States
   const [clientRooms, setClientRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -30,11 +30,20 @@ export default function SupportMemberProfile() {
   const [typingUsers, setTypingUsers] = useState({}); // supportMemberId -> name
   const [isTypingLocal, setIsTypingLocal] = useState(false);
 
-  // Secure Internal Private Notes (Step 5)
+  // Secure Internal Private Notes
   const [internalNotes, setInternalNotes] = useState([]);
   const [newNoteText, setNewNoteText] = useState('');
   const [newNoteType, setNewNoteType] = useState('general'); // general, escalation, billing, technical
   const [savingNote, setSavingNote] = useState(false);
+
+  // Email Composer States (Phase 5)
+  const [clientEmails, setClientEmails] = useState([]);
+  const [composerRecipient, setComposerRecipient] = useState('');
+  const [composerSubject, setComposerSubject] = useState('');
+  const [composerBody, setComposerBody] = useState('');
+  const [draftTypeSelection, setDraftTypeSelection] = useState('follow_up'); // follow_up, onboarding, escalation
+  const [generatingDraft, setGeneratingDraft] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const messageEndRef = useRef(null);
 
@@ -46,7 +55,6 @@ export default function SupportMemberProfile() {
   useEffect(() => {
     if (!member) return;
 
-    // Connect using current HTTP host or environment config
     const socketUrl = import.meta.env.VITE_API_URL || '';
     const newSocket = io(socketUrl, {
       withCredentials: true,
@@ -58,9 +66,7 @@ export default function SupportMemberProfile() {
       newSocket.emit('auth', { supportMemberId: member._id });
     });
 
-    // Handle new message arrival
     newSocket.on('new_message', (msg) => {
-      // Only append if the message belongs to the currently active chat room
       setMessages((prev) => {
         if (prev.some(p => p._id === msg._id)) return prev;
         return [...prev, msg];
@@ -68,7 +74,6 @@ export default function SupportMemberProfile() {
       scrollToBottom();
     });
 
-    // Handle incoming typing indicators
     newSocket.on('typing_status', ({ conversationId, supportMemberId, fullName, isTyping }) => {
       setTypingUsers((prev) => ({
         ...prev,
@@ -76,7 +81,6 @@ export default function SupportMemberProfile() {
       }));
     });
 
-    // Handle online agent updates
     newSocket.on('presence_update', ({ supportMemberId, status }) => {
       if (member && member._id === supportMemberId) {
         setMember(prev => ({ ...prev, status }));
@@ -125,6 +129,11 @@ export default function SupportMemberProfile() {
     setSelectedRoom(null);
     setMessages([]);
     
+    // Prefill composer coordinates
+    setComposerRecipient(client.email || '');
+    setComposerSubject(`Update regarding your ${client.product || 'Enterprise Standard'} plan - ORAI Success`);
+    setComposerBody('');
+
     // Filter calls for this client
     const filtered = callsList.filter(call => {
       const callClientId = typeof call.clientId === 'object' ? call.clientId._id : call.clientId;
@@ -136,7 +145,6 @@ export default function SupportMemberProfile() {
     try {
       const roomsRes = await chatApi.getClientConversations(client._id);
       setClientRooms(roomsRes.data || []);
-      // Auto-select standard API room
       if (roomsRes.data && roomsRes.data.length > 0) {
         handleSelectRoom(roomsRes.data[0]);
       }
@@ -150,6 +158,14 @@ export default function SupportMemberProfile() {
       setInternalNotes(notesRes.data || []);
     } catch (err) {
       console.error('Failed loading internal notes', err);
+    }
+
+    // Fetch email logs history
+    try {
+      const emailsRes = await chatApi.getEmailHistory(client._id);
+      setClientEmails(emailsRes.data || []);
+    } catch (err) {
+      console.error('Failed loading email logs', err);
     }
   };
 
@@ -169,8 +185,6 @@ export default function SupportMemberProfile() {
       const messagesRes = await chatApi.getMessages(room._id);
       setMessages(messagesRes.data || []);
       scrollToBottom();
-      
-      // Mark read
       await chatApi.markRead(room._id);
     } catch (err) {
       console.error('Error fetching room message history', err);
@@ -195,11 +209,9 @@ export default function SupportMemberProfile() {
     e.preventDefault();
     if (!newMessageText.trim() || !socket || !selectedRoom) return;
 
-    // Reset local typing indicator
     setIsTypingLocal(false);
     socket.emit('typing', { conversationId: selectedRoom._id, isTyping: false, fullName: member.fullName });
 
-    // Send via socket
     socket.emit('send_message', {
       conversationId: selectedRoom._id,
       message: newMessageText,
@@ -226,6 +238,47 @@ export default function SupportMemberProfile() {
       alert(err.message || 'Failed to save secure notes');
     } finally {
       setSavingNote(false);
+    }
+  };
+
+  // Generate AI email suggested draft (Phase 4 - Step 3)
+  const handleGenerateDraft = async () => {
+    if (!selectedClient) return;
+    setGeneratingDraft(true);
+    try {
+      const res = await chatApi.generateAiDraft({
+        clientId: selectedClient._id,
+        draftType: draftTypeSelection
+      });
+      setComposerSubject(res.data.subject);
+      setComposerBody(res.data.body);
+    } catch (err) {
+      alert(err.message || 'Failed to generate AI response draft');
+    } finally {
+      setGeneratingDraft(false);
+    }
+  };
+
+  // Send professional email to corporate client (Phase 5 - Step 1)
+  const handleSendEmail = async (e) => {
+    e.preventDefault();
+    if (!composerRecipient || !composerSubject || !composerBody || sendingEmail) return;
+
+    setSendingEmail(true);
+    try {
+      const res = await chatApi.sendClientEmail(selectedClient._id, {
+        recipientEmail: composerRecipient,
+        subject: composerSubject,
+        body: composerBody,
+        attachments: []
+      });
+      setClientEmails(prev => [res.data, ...prev]);
+      setComposerBody('');
+      alert('Email logs transmitted and saved inside communications dashboard!');
+    } catch (err) {
+      alert(err.message || 'Failed to process email dispatch');
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -279,7 +332,70 @@ export default function SupportMemberProfile() {
   const sentimentStats = getSentimentStats();
   const escalatedCalls = clientCalls.filter(c => c.issues && c.issues.length > 0);
 
-  // Filter typing list to avoid rendering undefined strings
+  // Phase 4 - Step 1: AI Alert Dispatch Engine
+  const getAiAlerts = () => {
+    const alerts = [];
+    if (clientCalls.length === 0) return alerts;
+
+    const hasNegative = clientCalls.some(c => c.sentiment?.toLowerCase() === 'negative');
+    const avgScore = clientCalls.reduce((acc, c) => acc + (c.satisfactionScore || 5), 0) / clientCalls.length;
+    const pendingActionsCount = clientCalls.reduce((acc, c) => acc + (c.actionItems?.length || 0), 0);
+
+    if (hasNegative || avgScore < 5.5) {
+      alerts.push({
+        id: 'sentiment',
+        type: 'danger',
+        message: '🚨 Negative Sentiment Detected: Recent voice check-ins flagged severe customer dissatisfaction.'
+      });
+    }
+
+    if (avgScore < 4 || (hasNegative && escalatedCalls.length > 0)) {
+      alerts.push({
+        id: 'churn',
+        type: 'danger',
+        message: '⚠️ High Churn Escalation Risk: Account health is falling. Outbound manager intervention required.'
+      });
+    }
+
+    if (pendingActionsCount > 0) {
+      alerts.push({
+        id: 'actions',
+        type: 'warning',
+        message: `🕒 Urgent follow-up needed: ${pendingActionsCount} AI-flagged technical deliverables remain unresolved.`
+      });
+    }
+
+    return alerts;
+  };
+
+  // Phase 4 - Step 2: AI Diagnostic Summary Panel
+  const getAiDiagnostics = () => {
+    if (clientCalls.length === 0) {
+      return {
+        summary: "No voice audit records registered.",
+        concerns: "No active service complaints resolved.",
+        churnRisk: "Low",
+        unresolved: "None pending."
+      };
+    }
+
+    const lastCall = clientCalls[0];
+    const avgScore = clientCalls.reduce((acc, c) => acc + (c.satisfactionScore || 5), 0) / clientCalls.length;
+    const allIssues = escalatedCalls.reduce((acc, c) => [...acc, ...(c.issues || [])], []);
+    const churn = avgScore < 4.5 ? 'High' : avgScore < 7 ? 'Medium' : 'Low';
+
+    return {
+      summary: lastCall.summary || "Client completed feedback check-in. System status currently operating inside standard limits.",
+      concerns: allIssues.length > 0 ? allIssues.slice(0, 3).join(', ') : "No active service interruptions or technical blockers.",
+      churnRisk: churn,
+      unresolved: lastCall.actionItems && lastCall.actionItems.length > 0 
+        ? lastCall.actionItems.join(', ') 
+        : "All action parameters verified."
+    };
+  };
+
+  const aiAlerts = getAiAlerts();
+  const aiDiag = getAiDiagnostics();
   const activeTypers = Object.values(typingUsers).filter(Boolean);
 
   if (loading) {
@@ -391,7 +507,7 @@ export default function SupportMemberProfile() {
 
       {/* Split Workspace View */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left column: Active assignments list (Master) */}
+        {/* Left column: Active directory list */}
         <div className="lg:col-span-4 bg-white border border-border-primary rounded-3xl p-5 shadow-sm space-y-4">
           <h2 className="text-lg font-bold text-text-primary border-b border-border-primary pb-3">
             Corporate Client Directory ({assignedClients.length})
@@ -453,6 +569,24 @@ export default function SupportMemberProfile() {
           ) : (
             <div className="space-y-6 flex-1 flex flex-col justify-between">
               <div>
+                {/* AI Alerts Header Panel (Phase 4 - Step 1) */}
+                {aiAlerts.length > 0 && (
+                  <div className="space-y-2 mb-6">
+                    {aiAlerts.map((alert, idx) => (
+                      <div
+                        key={idx}
+                        className={`px-4 py-3 rounded-2xl border text-xs font-bold flex items-center justify-between shadow-sm animate-pulse ${
+                          alert.type === 'danger'
+                            ? 'bg-danger-50 border-danger-100 text-danger-700'
+                            : 'bg-warning-50 border-warning-100 text-warning-700'
+                        }`}
+                      >
+                        <span>{alert.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* 1. Client Context Mini-Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border-primary pb-5 gap-4">
                   <div>
@@ -474,45 +608,33 @@ export default function SupportMemberProfile() {
                   </div>
                 </div>
 
-                {/* 2. Client Analytics Dashboard Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-5">
-                  {/* Sentiment Progress Card */}
-                  <div className="bg-bg-secondary border border-border-primary p-4 rounded-2xl space-y-2 shadow-inner">
-                    <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">AI Sentiment Profile</p>
-                    {clientCalls.length === 0 ? (
-                      <p className="text-xs text-text-tertiary">No interaction telemetry</p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs font-semibold">
-                          <span className="text-success-600">Pos ({sentimentStats.positive}%)</span>
-                          <span className="text-danger-600">Neg ({sentimentStats.negative}%)</span>
-                        </div>
-                        {/* Tri-color Progress Bar */}
-                        <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden flex">
-                          <div style={{ width: `${sentimentStats.positive}%` }} className="bg-success-500 h-full"></div>
-                          <div style={{ width: `${sentimentStats.neutral}%` }} className="bg-slate-400 h-full"></div>
-                          <div style={{ width: `${sentimentStats.negative}%` }} className="bg-danger-500 h-full"></div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Call Volume Statistics */}
-                  <div className="bg-bg-secondary border border-border-primary p-4 rounded-2xl space-y-1 shadow-inner">
-                    <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">Call interactions</p>
-                    <h3 className="text-xl font-black text-text-primary mt-0.5">{clientCalls.length} calls</h3>
-                    <p className="text-[10px] text-text-tertiary font-bold">Total voice engagements</p>
-                  </div>
-
-                  {/* Last Interactions Tracker */}
-                  <div className="bg-bg-secondary border border-border-primary p-4 rounded-2xl space-y-1 shadow-inner">
-                    <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">Last call date</p>
-                    <h3 className="text-base font-bold text-text-primary truncate mt-0.5">
-                      {selectedClient.lastCallAt 
-                        ? new Date(selectedClient.lastCallAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) 
-                        : 'Never contacted'}
+                {/* 2. AI Diagnostics Dashboard Summary Panel (Phase 4 - Step 2) */}
+                <div className="bg-primary-50/20 border border-primary-100 rounded-3xl p-5 mt-6 space-y-4">
+                  <div className="flex items-center justify-between border-b border-primary-100/50 pb-2.5">
+                    <h3 className="text-xs font-black text-primary-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>🤖</span> AI Diagnostic Assistant
                     </h3>
-                    <p className="text-[10px] text-text-tertiary font-bold">Telephony timestamp</p>
+                    <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase border ${
+                      aiDiag.churnRisk === 'High' ? 'bg-danger-50 border-danger-100 text-danger-700' :
+                      aiDiag.churnRisk === 'Medium' ? 'bg-warning-50 border-warning-100 text-warning-700' :
+                      'bg-success-50 border-success-100 text-success-700'
+                    }`}>
+                      Churn Risk: {aiDiag.churnRisk}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold">
+                    <div className="space-y-1 bg-white border border-border-primary p-3 rounded-2xl">
+                      <p className="text-[10px] text-text-tertiary uppercase">Recent Concerns</p>
+                      <p className="text-text-primary truncate">{aiDiag.concerns}</p>
+                    </div>
+                    <div className="space-y-1 bg-white border border-border-primary p-3 rounded-2xl">
+                      <p className="text-[10px] text-text-tertiary uppercase">Unresolved items</p>
+                      <p className="text-text-primary truncate">{aiDiag.unresolved}</p>
+                    </div>
+                  </div>
+                  <div className="bg-white border border-primary-100/50 p-3 rounded-2xl text-xs leading-relaxed font-semibold text-text-secondary">
+                    <p className="text-[10px] text-text-tertiary uppercase mb-0.5">Issue Summary</p>
+                    {aiDiag.summary}
                   </div>
                 </div>
 
@@ -546,7 +668,7 @@ export default function SupportMemberProfile() {
                         : 'border-transparent text-text-tertiary hover:text-text-secondary'
                     }`}
                   >
-                    💬 Real-Time Chat Channels
+                    💬 Chat Channels ({clientRooms.length})
                   </button>
                   <button
                     onClick={() => setActiveTab('notes')}
@@ -556,7 +678,17 @@ export default function SupportMemberProfile() {
                         : 'border-transparent text-text-tertiary hover:text-text-secondary'
                     }`}
                   >
-                    📝 Secure Staff Notes ({internalNotes.length})
+                    📝 Private Notes ({internalNotes.length})
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('emails')}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                      activeTab === 'emails' 
+                        ? 'border-primary-500 text-primary-600' 
+                        : 'border-transparent text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    📧 Email Desk ({clientEmails.length})
                   </button>
                 </div>
 
@@ -604,7 +736,6 @@ export default function SupportMemberProfile() {
                                   <p className="text-xs italic text-text-tertiary">Call in queue or completed without recording transcript.</p>
                                 )}
 
-                                {/* Action items & playback */}
                                 <div className="flex flex-wrap gap-2 pt-1.5 items-center justify-between">
                                   {call.actionItems && call.actionItems.length > 0 && (
                                     <span className="text-[10px] font-bold text-primary-700 bg-primary-50 px-2 py-0.5 rounded-md">
@@ -680,10 +811,9 @@ export default function SupportMemberProfile() {
                     </div>
                   )}
 
-                  {/* TAB 3: REAL-TIME SUCCESS CHAT (Step 3 & 4) */}
+                  {/* TAB 3: REAL-TIME CHAT */}
                   {activeTab === 'chat' && (
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-5 border border-border-primary rounded-3xl overflow-hidden bg-bg-secondary h-[50vh]">
-                      {/* Left: Chat Rooms list */}
                       <div className="md:col-span-4 border-r border-border-primary bg-white p-3 space-y-2 overflow-y-auto">
                         <h4 className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider px-2.5 pb-1">
                           Rooms Channels
@@ -706,11 +836,9 @@ export default function SupportMemberProfile() {
                         })}
                       </div>
 
-                      {/* Right: Message Workspace */}
                       <div className="md:col-span-8 flex flex-col justify-between h-full bg-white relative">
                         {selectedRoom ? (
                           <>
-                            {/* Room Header */}
                             <div className="px-4 py-3 border-b border-border-primary flex items-center justify-between bg-bg-secondary">
                               <div>
                                 <h4 className="text-xs font-bold text-text-primary tracking-tight">
@@ -722,7 +850,6 @@ export default function SupportMemberProfile() {
                               </div>
                             </div>
 
-                            {/* Message Log */}
                             <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[30vh]">
                               {messages.length === 0 ? (
                                 <p className="text-[11px] text-text-tertiary italic text-center py-6">
@@ -738,7 +865,6 @@ export default function SupportMemberProfile() {
                                         className={`flex gap-2.5 max-w-[85%] ${isSelf ? 'ml-auto flex-row-reverse' : ''}`}
                                       >
                                         <div className="flex flex-col space-y-1">
-                                          {/* Sender header */}
                                           {!isSelf && (
                                             <span className="text-[9px] font-bold text-text-tertiary uppercase">
                                               {msg.sender?.fullName || 'Success Agent'} &bull; {msg.sender?.designation || 'Specialist'}
@@ -763,9 +889,7 @@ export default function SupportMemberProfile() {
                               )}
                             </div>
 
-                            {/* Typing Indicators & Message Input Form */}
                             <div className="p-3 border-t border-border-primary bg-bg-secondary">
-                              {/* Animated Typing indicators */}
                               {activeTypers.length > 0 && (
                                 <div className="text-[10px] text-text-tertiary font-semibold pb-1.5 animate-pulse">
                                   ✍️ {activeTypers.join(', ')} is typing...
@@ -804,10 +928,9 @@ export default function SupportMemberProfile() {
                     </div>
                   )}
 
-                  {/* TAB 4: SECURE STAFF INTERNAL NOTES (Step 5) */}
+                  {/* TAB 4: PRIVATE NOTES */}
                   {activeTab === 'notes' && (
                     <div className="space-y-6">
-                      {/* Notes Submit Form */}
                       <form onSubmit={handleSaveNote} className="bg-bg-secondary border border-border-primary p-4 rounded-2xl space-y-4 shadow-inner">
                         <div>
                           <label className="block text-xs font-bold text-text-primary uppercase tracking-wider mb-1.5">
@@ -845,7 +968,6 @@ export default function SupportMemberProfile() {
                         </div>
                       </form>
 
-                      {/* Notes Log */}
                       <div className="space-y-3">
                         {internalNotes.length === 0 ? (
                           <div className="text-center py-8 text-text-tertiary italic text-xs">
@@ -896,6 +1018,131 @@ export default function SupportMemberProfile() {
                               </p>
                             </div>
                           ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 5: EMAIL SUCCESS DESK (Phase 5 - Step 1, 2, 3) */}
+                  {activeTab === 'emails' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                      {/* Left: Email Composer Form */}
+                      <form onSubmit={handleSendEmail} className="lg:col-span-7 bg-bg-secondary border border-border-primary p-5 rounded-3xl space-y-4 shadow-inner">
+                        <div className="flex items-center justify-between border-b border-border-primary pb-3 mb-2">
+                          <h4 className="text-xs font-black text-text-primary uppercase tracking-wider">
+                            Send Email Outbox
+                          </h4>
+                          
+                          {/* AI Assistant Quick Draft Trigger */}
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              value={draftTypeSelection}
+                              onChange={(e) => setDraftTypeSelection(e.target.value)}
+                              className="px-2 py-1 bg-white border border-border-primary rounded-lg text-[10px] font-bold text-text-primary cursor-pointer focus:outline-none"
+                            >
+                              <option value="follow_up">Suggested Follow-Up</option>
+                              <option value="onboarding">Welcome / Kickoff</option>
+                              <option value="escalation">Technical Escalation</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={handleGenerateDraft}
+                              disabled={generatingDraft}
+                              className="bg-primary-600 hover:bg-primary-700 text-white font-bold px-2.5 py-1 rounded-lg text-[10px] transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
+                            >
+                              {generatingDraft ? '🤖 Drafting...' : '🤖 AI Suggested Draft'}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3 text-xs font-semibold">
+                          <div>
+                            <label className="block text-[10px] font-bold text-text-tertiary uppercase mb-1">To (Client Email)</label>
+                            <input
+                              type="email"
+                              value={composerRecipient}
+                              onChange={(e) => setComposerRecipient(e.target.value)}
+                              className="w-full bg-white border border-border-primary rounded-xl px-3.5 py-2 text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                              placeholder="client@company.com"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-text-tertiary uppercase mb-1">Subject</label>
+                            <input
+                              type="text"
+                              value={composerSubject}
+                              onChange={(e) => setComposerSubject(e.target.value)}
+                              className="w-full bg-white border border-border-primary rounded-xl px-3.5 py-2 text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                              placeholder="Email subject..."
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-text-tertiary uppercase mb-1">Message Body</label>
+                            <textarea
+                              value={composerBody}
+                              onChange={(e) => setComposerBody(e.target.value)}
+                              rows={8}
+                              className="w-full bg-white border border-border-primary rounded-xl px-3.5 py-2.5 text-xs text-text-primary leading-relaxed placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-500/20 resize-none font-sans"
+                              placeholder="Compose professional communication to client..."
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            type="submit"
+                            disabled={!composerBody.trim() || sendingEmail}
+                            className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-md shadow-primary-500/10 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                          >
+                            {sendingEmail ? 'Transmitting email...' : 'Approve & Send Email'}
+                          </button>
+                        </div>
+                      </form>
+
+                      {/* Right: Sent Emails History logs */}
+                      <div className="lg:col-span-5 space-y-4 max-h-[55vh] overflow-y-auto pr-1.5">
+                        <h4 className="text-[10px] font-black text-text-tertiary uppercase tracking-wider">
+                          Communication History logs ({clientEmails.length})
+                        </h4>
+                        {clientEmails.length === 0 ? (
+                          <div className="text-center py-12 text-text-tertiary italic text-xs border border-border-primary rounded-2xl bg-white">
+                            No sent email logs available for this corporate client.
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {clientEmails.map((email) => (
+                              <div
+                                key={email._id}
+                                className="border border-border-primary rounded-2xl p-4 bg-white space-y-3 hover:border-primary-200 transition-all"
+                              >
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className="font-bold text-text-primary truncate max-w-[65%]">
+                                    {email.subject}
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase border ${
+                                    email.deliveryStatus === 'delivered' ? 'bg-success-50 border-success-100 text-success-700' :
+                                    email.deliveryStatus === 'failed' ? 'bg-danger-50 border-danger-100 text-danger-700' :
+                                    'bg-slate-50 border-slate-100 text-slate-700'
+                                  }`}>
+                                    {email.deliveryStatus}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-text-tertiary font-semibold space-y-0.5 border-b border-border-primary/50 pb-2">
+                                  <p>To: {email.recipientEmail}</p>
+                                  <p>By: {email.senderId?.fullName || 'Success Specialist'} ({email.senderId?.role || 'Staff'})</p>
+                                  <p>Sent: {new Date(email.createdAt).toLocaleString()}</p>
+                                </div>
+                                <p className="text-[11px] leading-relaxed text-text-secondary whitespace-pre-line font-medium bg-bg-secondary p-3 rounded-xl border border-border-primary max-h-36 overflow-y-auto">
+                                  {email.body}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
                     </div>

@@ -42,11 +42,24 @@ export const markRead = (conversationId) => {
   return api.post(`/messages/${conversationId}/read`);
 };
 
-// 3. Secure Private Notes REST APIs (Step 5)
+// 3. Secure Private Notes REST APIs
 export const getInternalNotes = (clientId) => {
   return api.get(`/internal-notes/${clientId}`);
 };
 
 export const createInternalNote = (clientId, data) => {
   return api.post(`/internal-notes/${clientId}`, data);
+};
+
+// 4. AI & Email REST APIs (Phase 4 & 5)
+export const generateAiDraft = (data) => {
+  return api.post('/ai/draft-email', data);
+};
+
+export const sendClientEmail = (clientId, data) => {
+  return api.post(`/emails/${clientId}`, data);
+};
+
+export const getEmailHistory = (clientId) => {
+  return api.get(`/emails/${clientId}`);
 };
