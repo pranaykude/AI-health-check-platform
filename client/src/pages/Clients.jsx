@@ -313,7 +313,7 @@ export default function Clients() {
                         <button
                           onClick={() => handleCall(client._id)}
                           disabled={callingId === client._id}
-                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
+                          className={`btn-call-now flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
                             callingId === client._id
                               ? 'text-primary-400 bg-primary-50 cursor-wait'
                               : 'text-success-600 bg-success-50 hover:bg-success-100 hover:scale-105 active:scale-95'
