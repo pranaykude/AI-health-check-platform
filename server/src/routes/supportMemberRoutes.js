@@ -112,5 +112,7 @@ router.post('/', protect, authorize('admin', 'manager'), validateSupportMember, 
 
 // 5. Get assigned clients
 router.get('/:id/clients', protect, supportMemberController.getAssignedClients);
+router.post('/:id/assign-clients', protect, authorize('admin', 'manager'), supportMemberController.assignClientsToMember);
+router.post('/:id/remove-client', protect, authorize('admin', 'manager'), supportMemberController.removeClientFromMember);
 
 module.exports = router;

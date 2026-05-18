@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import * as supportApi from '../api/supportMemberApi';
 import * as callApi from '../api/callApi';
 import * as chatApi from '../api/chatApi';
+import * as clientApi from '../api/clientApi';
 
 export default function SupportMemberProfile() {
   const { id } = useParams();
@@ -12,6 +13,13 @@ export default function SupportMemberProfile() {
   const [allCalls, setAllCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Client Assignment States
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [allClients, setAllClients] = useState([]);
+  const [selectedClients, setSelectedClients] = useState([]);
+  const [modalSearch, setModalSearch] = useState('');
+  const [submittingAssignment, setSubmittingAssignment] = useState(false);
 
   // Active Client selection for Step 3 Context Panel
   const [selectedClient, setSelectedClient] = useState(null);
@@ -144,6 +152,17 @@ export default function SupportMemberProfile() {
       if (clientsList.length > 0) {
         handleSelectClient(clientsList[0], callsList);
       }
+
+      // 5. Fetch all system clients for the assignment selector
+      try {
+        const allClientsRes = await clientApi.getClients({ limit: 1000 });
+        setAllClients(allClientsRes.data || []);
+      } catch (err) {
+        console.error('Failed to load system clients list', err);
+      }
+
+      // Pre-populate selected clients list
+      setSelectedClients(clientsList.map(c => c._id));
     } catch (err) {
       setError(err.message || 'Failed to load support member profile');
     } finally {
@@ -349,6 +368,47 @@ export default function SupportMemberProfile() {
       }, 3000);
     } catch (err) {
       alert(err.message || 'Failed to trigger outbound call');
+    }
+  };
+
+  const handleToggleClientSelection = (clientId) => {
+    if (selectedClients.includes(clientId)) {
+      setSelectedClients(selectedClients.filter(id => id !== clientId));
+    } else {
+      setSelectedClients([...selectedClients, clientId]);
+    }
+  };
+
+  const handleSaveAssignments = async () => {
+    setSubmittingAssignment(true);
+    try {
+      await supportApi.assignClientsToMember(member._id, selectedClients);
+      setIsAssignModalOpen(false);
+      // Refresh support specialist data
+      const clientsRes = await supportApi.getAssignedClients(id);
+      const clientsList = clientsRes.data || [];
+      setAssignedClients(clientsList);
+      
+      // Update member metrics count
+      setMember(prev => ({
+        ...prev,
+        metrics: {
+          ...prev.metrics,
+          assignedClientCount: clientsList.length,
+          activeWorkload: clientsList.length
+        }
+      }));
+
+      // If no active client was selected before, select the first one
+      if (clientsList.length > 0 && !selectedClient) {
+        handleSelectClient(clientsList[0]);
+      }
+      
+      alert('Portfolio assignments successfully synchronized and saved!');
+    } catch (err) {
+      alert(err.message || 'Failed to update assignments');
+    } finally {
+      setSubmittingAssignment(false);
     }
   };
 
@@ -559,18 +619,32 @@ export default function SupportMemberProfile() {
         </div>
 
         {/* Corporate stats side block */}
-        <div className="bg-bg-secondary border border-border-primary p-4 rounded-2xl flex gap-6 text-center md:text-left">
-          <div>
-            <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">Assignments</p>
-            <h4 className="text-2xl font-bold text-text-primary mt-1">{assignedClients.length}</h4>
+        <div className="flex flex-col sm:flex-row gap-4 items-stretch w-full md:w-auto">
+          <div className="bg-bg-secondary border border-border-primary p-4 rounded-2xl flex gap-6 text-center md:text-left flex-1 justify-center items-center">
+            <div>
+              <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">Assignments</p>
+              <h4 className="text-2xl font-bold text-text-primary mt-1">{assignedClients.length}</h4>
+            </div>
+            <div className="w-px bg-border-primary self-stretch"></div>
+            <div>
+              <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">Live Calls</p>
+              <h4 className="text-2xl font-bold text-text-primary mt-1">
+                {allCalls.filter(c => c.clientId && assignedClients.some(ac => ac._id === (typeof c.clientId === 'object' ? c.clientId._id : c.clientId))).length}
+              </h4>
+            </div>
           </div>
-          <div className="w-px bg-border-primary"></div>
-          <div>
-            <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">Live Calls</p>
-            <h4 className="text-2xl font-bold text-text-primary mt-1">
-              {allCalls.filter(c => c.clientId && assignedClients.some(ac => ac._id === (typeof c.clientId === 'object' ? c.clientId._id : c.clientId))).length}
-            </h4>
-          </div>
+          <button
+            onClick={() => {
+              setModalSearch('');
+              setIsAssignModalOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold px-5 py-3 rounded-2xl text-xs shadow-md shadow-primary-500/10 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            Assign Clients
+          </button>
         </div>
       </div>
 
@@ -1398,6 +1472,124 @@ export default function SupportMemberProfile() {
                 className="px-6 py-2.5 bg-white border border-border-primary hover:bg-bg-tertiary text-text-secondary font-bold text-xs rounded-xl transition-all cursor-pointer active:scale-95"
               >
                 Close Audit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ASSIGN CLIENTS */}
+      {isAssignModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-xl max-h-[85vh] flex flex-col shadow-2xl border border-border-primary animate-scale-in">
+            {/* Header */}
+            <div className="p-6 border-b border-border-primary flex items-center justify-between bg-bg-secondary">
+              <div>
+                <h2 className="text-xl font-bold text-text-primary">Assign Corporate Clients</h2>
+                <p className="text-xs text-text-tertiary font-medium mt-0.5">Assign accounts to <strong className="text-text-primary">{member.fullName}</strong></p>
+              </div>
+              <button
+                onClick={() => setIsAssignModalOpen(false)}
+                className="text-text-tertiary hover:text-text-primary p-2 hover:bg-bg-tertiary rounded-xl transition-all cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* List of Clients (Scrollable container) */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {selectedClients.length > 50 && (
+                <div className="bg-danger-50 border border-danger-100 text-danger-700 px-4 py-3.5 rounded-2xl text-xs font-bold flex items-start gap-2 shadow-sm animate-pulse">
+                  <span>⚠️ Warning: Workload threshold exceeded! This support specialist has {selectedClients.length} assigned clients. The recommended enterprise maximum is 50.</span>
+                </div>
+              )}
+
+              {/* Search Bar inside Modal */}
+              <div className="relative">
+                <svg className="absolute left-3.5 top-3.5 w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Filter registered clients by name, email, phone..."
+                  value={modalSearch}
+                  onChange={(e) => setModalSearch(e.target.value)}
+                  className="w-full bg-bg-secondary border border-border-primary rounded-xl pl-10 pr-4 py-3 text-xs focus:outline-none focus:border-primary-500 focus:bg-white transition-all text-text-primary font-medium"
+                />
+              </div>
+
+              <div className="flex justify-between items-center text-xs font-bold text-text-tertiary uppercase tracking-wide px-1">
+                <span>Select Clients to Assign</span>
+                <span>{selectedClients.length} Selected</span>
+              </div>
+              
+              {allClients.length === 0 ? (
+                <p className="text-sm text-text-tertiary py-8 text-center">No clients registered in the system yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {allClients
+                    .filter((client) => {
+                      const term = modalSearch.toLowerCase();
+                      return (
+                        client.name.toLowerCase().includes(term) ||
+                        (client.email && client.email.toLowerCase().includes(term)) ||
+                        (client.phone && client.phone.includes(term))
+                      );
+                    })
+                    .map((client) => {
+                      const isChecked = selectedClients.includes(client._id);
+                      return (
+                        <div
+                          key={client._id}
+                          onClick={() => handleToggleClientSelection(client._id)}
+                          className={`flex items-center gap-4 px-4 py-3 rounded-2xl border transition-all cursor-pointer hover:border-primary-300 ${
+                            isChecked 
+                              ? 'bg-primary-50/50 border-primary-300 shadow-sm' 
+                              : 'bg-white border-border-primary'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
+                            isChecked ? 'bg-primary-600 border-primary-600 text-white' : 'border-border-secondary bg-white'
+                          }`}>
+                            {isChecked && (
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-text-primary truncate">{client.name}</p>
+                            <p className="text-xs text-text-tertiary truncate">{client.email || 'No email'} | {client.phone}</p>
+                          </div>
+                          {client.assignedSupportMember && client.assignedSupportMember !== member._id && (
+                            <span className="text-[10px] font-bold text-warning-700 bg-warning-50 border border-warning-100 px-2 py-0.5 rounded-md self-center">
+                              Reassigns
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="p-6 border-t border-border-primary flex justify-end gap-3 bg-bg-secondary rounded-b-3xl">
+              <button
+                type="button"
+                onClick={() => setIsAssignModalOpen(false)}
+                className="px-5 py-3 rounded-xl border border-border-primary hover:bg-bg-tertiary text-text-secondary font-bold text-sm transition-all active:scale-95 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveAssignments}
+                disabled={submittingAssignment}
+                className="px-6 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm shadow-md shadow-primary-500/10 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                {submittingAssignment ? 'Saving...' : 'Confirm Assignments'}
               </button>
             </div>
           </div>

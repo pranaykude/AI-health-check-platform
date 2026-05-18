@@ -19,6 +19,7 @@ export default function SupportTeam() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [selectedClients, setSelectedClients] = useState([]);
+  const [modalSearch, setModalSearch] = useState('');
 
   // Add Member Form state
   const [formData, setFormData] = useState({
@@ -102,6 +103,7 @@ export default function SupportTeam() {
     setSelectedMember(member);
     // Pre-populate with currently assigned client IDs
     setSelectedClients(member.assignedClients.map(c => typeof c === 'object' ? c._id : c));
+    setModalSearch('');
     setIsAssignModalOpen(true);
   };
 
@@ -117,10 +119,7 @@ export default function SupportTeam() {
     if (!selectedMember) return;
     setSubmitting(true);
     try {
-      await supportApi.assignClients({
-        supportMemberId: selectedMember._id,
-        clientIds: selectedClients
-      });
+      await supportApi.assignClientsToMember(selectedMember._id, selectedClients);
       setIsAssignModalOpen(false);
       fetchData();
     } catch (err) {
@@ -573,45 +572,77 @@ export default function SupportTeam() {
 
             {/* List of Clients (Scrollable container) */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              <p className="text-xs font-bold text-text-tertiary uppercase tracking-wide">Select Clients to Assign ({selectedClients.length} Selected)</p>
+              {selectedClients.length > 50 && (
+                <div className="bg-danger-50 border border-danger-100 text-danger-700 px-4 py-3.5 rounded-2xl text-xs font-bold flex items-start gap-2 shadow-sm animate-pulse">
+                  <span>⚠️ Warning: Workload threshold exceeded! This support specialist has {selectedClients.length} assigned clients. The recommended enterprise maximum is 50.</span>
+                </div>
+              )}
+
+              {/* Search Bar inside Modal */}
+              <div className="relative">
+                <svg className="absolute left-3.5 top-3.5 w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Filter registered clients by name, email, phone..."
+                  value={modalSearch}
+                  onChange={(e) => setModalSearch(e.target.value)}
+                  className="w-full bg-bg-secondary border border-border-primary rounded-xl pl-10 pr-4 py-3 text-xs focus:outline-none focus:border-primary-500 focus:bg-white transition-all text-text-primary font-medium"
+                />
+              </div>
+
+              <div className="flex justify-between items-center text-xs font-bold text-text-tertiary uppercase tracking-wide px-1">
+                <span>Select Clients to Assign</span>
+                <span>{selectedClients.length} Selected</span>
+              </div>
               
               {clients.length === 0 ? (
                 <p className="text-sm text-text-tertiary py-8 text-center">No clients registered in the system yet.</p>
               ) : (
                 <div className="space-y-2">
-                  {clients.map((client) => {
-                    const isChecked = selectedClients.includes(client._id);
-                    return (
-                      <div
-                        key={client._id}
-                        onClick={() => handleToggleClientSelection(client._id)}
-                        className={`flex items-center gap-4 px-4 py-3 rounded-2xl border transition-all cursor-pointer hover:border-primary-300 ${
-                          isChecked 
-                            ? 'bg-primary-50/50 border-primary-300 shadow-sm' 
-                            : 'bg-white border-border-primary'
-                        }`}
-                      >
-                        <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
-                          isChecked ? 'bg-primary-600 border-primary-600 text-white' : 'border-border-secondary bg-white'
-                        }`}>
-                          {isChecked && (
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
+                  {clients
+                    .filter((client) => {
+                      const term = modalSearch.toLowerCase();
+                      return (
+                        client.name.toLowerCase().includes(term) ||
+                        (client.email && client.email.toLowerCase().includes(term)) ||
+                        (client.phone && client.phone.includes(term))
+                      );
+                    })
+                    .map((client) => {
+                      const isChecked = selectedClients.includes(client._id);
+                      return (
+                        <div
+                          key={client._id}
+                          onClick={() => handleToggleClientSelection(client._id)}
+                          className={`flex items-center gap-4 px-4 py-3 rounded-2xl border transition-all cursor-pointer hover:border-primary-300 ${
+                            isChecked 
+                              ? 'bg-primary-50/50 border-primary-300 shadow-sm' 
+                              : 'bg-white border-border-primary'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
+                            isChecked ? 'bg-primary-600 border-primary-600 text-white' : 'border-border-secondary bg-white'
+                          }`}>
+                            {isChecked && (
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-text-primary truncate">{client.name}</p>
+                            <p className="text-xs text-text-tertiary truncate">{client.email || 'No email'} | {client.phone}</p>
+                          </div>
+                          {client.assignedSupportMember && client.assignedSupportMember !== selectedMember._id && (
+                            <span className="text-[10px] font-bold text-warning-700 bg-warning-50 border border-warning-100 px-2 py-0.5 rounded-md self-center">
+                              Reassigns
+                            </span>
                           )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-text-primary truncate">{client.name}</p>
-                          <p className="text-xs text-text-tertiary truncate">{client.email || 'No email'} | {client.phone}</p>
-                        </div>
-                        {client.assignedSupportMember && client.assignedSupportMember !== selectedMember._id && (
-                          <span className="text-[10px] font-bold text-warning-700 bg-warning-50 border border-warning-100 px-2 py-0.5 rounded-md self-center">
-                            Reassigns
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               )}
             </div>

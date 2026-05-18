@@ -51,3 +51,11 @@ export const assignClients = (data) => {
 export const getAssignedClients = (id) => {
   return api.get(`/support-members/${id}/clients`);
 };
+
+export const assignClientsToMember = (id, clientIds) => {
+  return api.post(`/support-members/${id}/assign-clients`, { clientIds });
+};
+
+export const removeClientFromMember = (id, clientId) => {
+  return api.post(`/support-members/${id}/remove-client`, { clientId });
+};

@@ -104,6 +104,27 @@ const clientSchema = new mongoose.Schema(
       ref: 'SupportMember',
       default: null,
     },
+    assignedAt: {
+      type: Date,
+      default: null,
+    },
+    assignmentHistory: [
+      {
+        supportMember: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'SupportMember'
+        },
+        assignedAt: {
+          type: Date,
+          default: Date.now
+        },
+        assignedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          default: null
+        }
+      }
+    ],
     assignedDepartment: {
       type: String,
       default: '',
