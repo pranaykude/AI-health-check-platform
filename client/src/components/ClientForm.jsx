@@ -18,10 +18,9 @@ export default function ClientForm({ isOpen, onClose, onSubmit, client }) {
   const [form, setForm] = useState(INITIAL_FORM);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [supportMembers, setSupportMembers] = useState([]);
 
   const isEditing = !!client;
-
-  const [supportMembers, setSupportMembers] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -248,7 +247,7 @@ export default function ClientForm({ isOpen, onClose, onSubmit, client }) {
                 <option value="">Unassigned</option>
                 {supportMembers.map((member) => (
                   <option key={member._id} value={member._id}>
-                    {member.fullName} ({member.role})
+                    {member.fullName} ({member.designation || member.role})
                   </option>
                 ))}
               </select>

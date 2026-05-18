@@ -40,10 +40,6 @@ export const deleteSupportMember = (id) => {
   return api.delete(`/support-members/${id}`);
 };
 
-export const getAssignedClients = (id) => {
-  return api.get(`/support-members/${id}/clients`);
-};
-
 export const getWorkloads = () => {
   return api.get('/support-members/workload');
 };
@@ -52,4 +48,6 @@ export const assignClients = (data) => {
   return api.post('/support-members/assign', data);
 };
 
-export default api;
+export const getAssignedClients = (id) => {
+  return api.get(`/support-members/${id}/clients`);
+};

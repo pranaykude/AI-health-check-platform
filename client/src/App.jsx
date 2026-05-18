@@ -5,10 +5,10 @@ import Clients from './pages/Clients';
 import Calls from './pages/Calls';
 import CallLogs from './pages/CallLogs';
 import LiveActivity from './pages/LiveActivity';
-import SupportTeam from './pages/SupportTeam';
-import SupportMemberProfile from './pages/SupportMemberProfile';
 import Login from './pages/Login';
 import VerifyOtp from './pages/VerifyOtp';
+import SupportTeam from './pages/SupportTeam';
+import SupportMemberProfile from './pages/SupportMemberProfile';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 

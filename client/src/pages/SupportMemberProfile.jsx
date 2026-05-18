@@ -1,595 +1,605 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  getSupportMember, 
-  updateSupportMember, 
-  getAssignedClients 
-} from '../api/supportMemberApi';
-import { getCallHistory, initiateCall } from '../api/callApi';
-import { updateClient } from '../api/clientApi';
-import useAuth from '../hooks/useAuth';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import * as supportApi from '../api/supportMemberApi';
+import * as callApi from '../api/callApi';
 
 export default function SupportMemberProfile() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const isAdminOrManager = user?.role === 'admin' || user?.role === 'manager';
-
   const [member, setMember] = useState(null);
-  const [clients, setClients] = useState([]);
+  const [assignedClients, setAssignedClients] = useState([]);
+  const [allCalls, setAllCalls] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // Selection for Client Context Panel
+  const [error, setError] = useState(null);
+
+  // Active Client selection for Step 3 Context Panel
   const [selectedClient, setSelectedClient] = useState(null);
-  const [clientCallHistory, setClientCallHistory] = useState([]);
-  const [loadingCallHistory, setLoadingCallHistory] = useState(false);
-  const [callingClientId, setCallingClientId] = useState(null);
+  const [clientCalls, setClientCalls] = useState([]);
+  const [loadingClientCalls, setLoadingClientCalls] = useState(false);
+  const [selectedCallDetails, setSelectedCallDetails] = useState(null);
 
-  // Status updating
-  const [updatingStatus, setUpdatingStatus] = useState(false);
+  // Active Tab inside Client Context Panel
+  const [activeTab, setActiveTab] = useState('summary'); // summary, transcripts, escalations
 
-  // Escalation state
-  const [updatingEscalation, setUpdatingEscalation] = useState(false);
+  useEffect(() => {
+    fetchMemberData();
+  }, [id]);
 
-  // Toast notification
-  const [toast, setToast] = useState(null);
-
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const fetchProfileAndClients = useCallback(async () => {
+  const fetchMemberData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const memberRes = await getSupportMember(id);
-      setMember(memberRes.data.supportMember);
+      // 1. Fetch support member
+      const memberRes = await supportApi.getSupportMember(id);
+      setMember(memberRes.data);
 
-      const clientsRes = await getAssignedClients(id);
-      const assignedList = clientsRes.data.assignedClients || [];
-      setClients(assignedList);
+      // 2. Fetch assigned clients list
+      const clientsRes = await supportApi.getAssignedClients(id);
+      const clientsList = clientsRes.data || [];
+      setAssignedClients(clientsList);
 
-      // Default select first client if any exist
-      if (assignedList.length > 0 && !selectedClient) {
-        setSelectedClient(assignedList[0]);
+      // 3. Fetch all system calls to match for history/sentiment
+      const callsRes = await callApi.getCallHistory(1, '', 200);
+      const callsList = callsRes.data?.calls || [];
+      setAllCalls(callsList);
+
+      // Auto-select first client if available
+      if (clientsList.length > 0) {
+        handleSelectClient(clientsList[0], callsList);
       }
     } catch (err) {
-      showToast(err.message || 'Failed to retrieve profile information', 'error');
+      setError(err.message || 'Failed to load support member profile');
     } finally {
       setLoading(false);
     }
-  }, [id, selectedClient]);
+  };
 
-  useEffect(() => {
-    fetchProfileAndClients();
-  }, [fetchProfileAndClients]);
+  const handleSelectClient = (client, callsList = allCalls) => {
+    setSelectedClient(client);
+    setSelectedCallDetails(null);
+    // Filter calls for this client
+    const filtered = callsList.filter(call => {
+      const callClientId = typeof call.clientId === 'object' ? call.clientId._id : call.clientId;
+      return callClientId === client._id;
+    });
+    setClientCalls(filtered);
+  };
 
-  // Fetch selected client's call history
-  const fetchClientCallHistory = useCallback(async (clientId) => {
-    if (!clientId) return;
-    setLoadingCallHistory(true);
-    try {
-      const res = await getCallHistory(1, '', 5, clientId);
-      setClientCallHistory(res.data.calls || []);
-    } catch (err) {
-      console.error('Error fetching client call logs:', err);
-    } finally {
-      setLoadingCallHistory(false);
+  const handleShowCallDetails = (call) => {
+    setSelectedCallDetails(call);
+  };
+
+  const handleInitiateCall = async (clientId) => {
+    if (!window.confirm('Are you sure you want to trigger an outbound AI call to this client now?')) {
+      return;
     }
-  }, []);
-
-  useEffect(() => {
-    if (selectedClient) {
-      fetchClientCallHistory(selectedClient._id);
-    }
-  }, [selectedClient, fetchClientCallHistory]);
-
-  const handleStatusToggle = async () => {
-    if (!member) return;
-    setUpdatingStatus(true);
     try {
-      const nextStatusMap = {
-        online: 'busy',
-        busy: 'offline',
-        offline: 'online'
-      };
-      const nextStatus = nextStatusMap[member.status] || 'online';
-      const res = await updateSupportMember(member._id, { status: nextStatus });
-      setMember(res.data.supportMember);
-      showToast(`Status updated to ${nextStatus}`);
+      await callApi.initiateCall(clientId);
+      alert('Outbound voice call process triggered successfully!');
+      // Reload calls in background
+      setTimeout(async () => {
+        const callsRes = await callApi.getCallHistory(1, '', 200);
+        const callsList = callsRes.data?.calls || [];
+        setAllCalls(callsList);
+        if (selectedClient) {
+          handleSelectClient(selectedClient, callsList);
+        }
+      }, 3000);
     } catch (err) {
-      showToast('Failed to toggle status', 'error');
-    } finally {
-      setUpdatingStatus(false);
+      alert(err.message || 'Failed to trigger outbound call');
     }
   };
 
-  const handleEscalationChange = async (level) => {
-    if (!selectedClient) return;
-    setUpdatingEscalation(true);
-    try {
-      // Save escalation level as client notes or metadata
-      const updatedNotes = `${selectedClient.notes || ''}\n[ESCALATION: ${level} at ${new Date().toLocaleString()}]`.trim();
-      await updateClient(selectedClient._id, { notes: updatedNotes });
-      
-      setSelectedClient(prev => ({
-        ...prev,
-        notes: updatedNotes
-      }));
-      showToast(`Escalation level set to ${level}`);
-    } catch (err) {
-      showToast('Failed to update escalation level', 'error');
-    } finally {
-      setUpdatingEscalation(false);
-    }
-  };
-
-  const handleCallInitiate = async (clientId) => {
-    setCallingClientId(clientId);
-    try {
-      await initiateCall(clientId);
-      showToast('Outbound call request successfully sent to Twilio!');
-      // Refresh call logs after a delay to show the queued call
-      setTimeout(() => fetchClientCallHistory(clientId), 2000);
-    } catch (err) {
-      showToast(err.message || 'Call initiation failed', 'error');
-    } finally {
-      setCallingClientId(null);
-    }
-  };
-
-  const getRoleLabel = (role) => {
-    const roles = {
-      support: 'Support Agent',
-      senior_support: 'Senior Agent',
-      technical_support: 'Tech Specialist',
-      operations: 'Ops Lead',
-      manager: 'Manager'
+  // Compute Client Sentiment Stats
+  const getSentimentStats = () => {
+    if (clientCalls.length === 0) return { positive: 0, neutral: 0, negative: 0 };
+    let pos = 0, neu = 0, neg = 0;
+    clientCalls.forEach(c => {
+      const s = c.sentiment?.toLowerCase() || '';
+      if (s.includes('pos')) pos++;
+      else if (s.includes('neg') || s.includes('fail') || s.includes('escalate')) neg++;
+      else neu++;
+    });
+    const total = clientCalls.length;
+    return {
+      positive: Math.round((pos / total) * 100),
+      neutral: Math.round((neu / total) * 100),
+      negative: Math.round((neg / total) * 100)
     };
-    return roles[role] || role;
   };
 
-  const getSentimentBadge = (sentiment) => {
-    const sent = (sentiment || 'neutral').toLowerCase();
-    if (sent === 'positive' || sent === 'happy') {
-      return 'bg-success-50 border-success-200 text-success-600';
-    }
-    if (sent === 'negative' || sent === 'frustrated' || sent === 'upset') {
-      return 'bg-danger-50 border-danger-200 text-danger-600';
-    }
-    return 'bg-warning-50 border-warning-200 text-warning-600';
-  };
+  const sentimentStats = getSentimentStats();
 
-  if (loading && !member) {
+  // Find escalations/issues
+  const escalatedCalls = clientCalls.filter(c => c.issues && c.issues.length > 0);
+
+  if (loading) {
     return (
-      <div className="p-8 lg:p-10 flex items-center justify-center min-h-screen bg-bg-secondary">
-        <div className="flex flex-col items-center gap-4">
-          <svg className="w-10 h-10 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <span className="text-text-secondary font-medium">Loading workspace data...</span>
-        </div>
+      <div className="flex h-screen items-center justify-center bg-bg-secondary">
+        <div className="w-12 h-12 border-4 border-primary-500/20 border-t-primary-500 rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  if (!member) {
+  if (error || !member) {
     return (
-      <div className="p-8 lg:p-10 text-center min-h-screen bg-bg-secondary flex flex-col items-center justify-center">
-        <h2 className="text-2xl font-bold text-text-primary">Workspace not found</h2>
-        <button onClick={() => navigate('/support-team')} className="mt-4 px-6 py-2.5 bg-primary-600 text-white rounded-xl">
-          Return to Directory
-        </button>
+      <div className="p-8">
+        <div className="bg-danger-50 border border-danger-100 text-danger-700 p-5 rounded-2xl text-center font-medium shadow-sm">
+          ⚠️ {error || 'Support Specialist not found'}
+        </div>
+        <div className="mt-4 text-center">
+          <Link to="/support-team" className="text-primary-600 font-bold hover:underline">
+            &larr; Back to Directory
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8 lg:p-10 animate-fade-in bg-bg-secondary min-h-full">
-      {/* Toast Alert */}
-      {toast && (
-        <div
-          className={`fixed top-6 right-6 z-50 px-6 py-4 rounded-2xl text-sm font-semibold shadow-2xl animate-slide-in border ${
-            toast.type === 'error'
-              ? 'bg-danger-50 border-danger-200 text-danger-600'
-              : 'bg-success-50 border-success-200 text-success-600'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${toast.type === 'error' ? 'bg-danger-500' : 'bg-success-500'}`} />
-            {toast.message}
-          </div>
-        </div>
-      )}
-
-      {/* Back navigation */}
-      <button
-        onClick={() => navigate('/support-team')}
-        className="inline-flex items-center gap-2 text-sm font-semibold text-text-secondary hover:text-primary-600 mb-6 group transition-colors cursor-pointer"
-      >
-        <svg className="w-5 h-5 transition-transform group-hover:-translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
-        Back to Directory
-      </button>
-
-      {/* Profile Header Grid */}
-      <div className="bg-white border border-border-primary rounded-2xl p-6 lg:p-8 shadow-sm mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition-shadow">
-        <div className="flex items-center gap-6">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 border border-primary-200 overflow-hidden flex items-center justify-center shadow-md">
-              {member.avatar ? (
-                <img src={member.avatar} alt={member.fullName} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-3xl font-extrabold text-primary-700">
-                  {member.fullName.charAt(0).toUpperCase()}
-                </span>
-              )}
-            </div>
-            {/* Status light */}
-            <span className={`absolute -bottom-1 -right-1 w-5.5 h-5.5 rounded-full border-3 border-white ${
-              member.status === 'online'
-                ? 'bg-success-500 animate-pulse'
-                : member.status === 'busy'
-                ? 'bg-warning-500'
-                : 'bg-secondary-400'
-            }`} />
-          </div>
-
-          <div>
-            <h1 className="text-3xl font-extrabold text-text-primary tracking-tight">{member.fullName}</h1>
-            <p className="text-sm font-semibold text-text-secondary mt-1">
-              {member.designation || getRoleLabel(member.role)}
-              {member.department && <span className="text-text-tertiary"> · {member.department}</span>}
-            </p>
-            {member.skills && member.skills.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {member.skills.map((s, idx) => (
-                  <span key={idx} className="px-2.5 py-0.5 bg-bg-secondary border border-border-primary rounded-lg text-[10px] font-bold text-text-secondary">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Connectivity status toggle */}
-        <div className="flex flex-col sm:items-end gap-2">
-          <span className="text-xs font-semibold text-text-tertiary">Live Status Override</span>
-          <button
-            onClick={handleStatusToggle}
-            disabled={updatingStatus}
-            className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold border transition-all active:scale-95 cursor-pointer ${
-              member.status === 'online'
-                ? 'bg-success-50 border-success-200 text-success-600 hover:bg-success-100'
-                : member.status === 'busy'
-                ? 'bg-warning-50 border-warning-200 text-warning-600 hover:bg-warning-100'
-                : 'bg-bg-secondary border-border-secondary text-text-secondary hover:bg-bg-tertiary'
-            }`}
-          >
-            {updatingStatus ? (
-              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-            ) : (
-              <span className={`w-2 h-2 rounded-full ${
-                member.status === 'online' ? 'bg-success-500' : member.status === 'busy' ? 'bg-warning-500' : 'bg-secondary-400'
-              }`} />
-            )}
-            Status: {member.status.toUpperCase()}
-          </button>
-        </div>
+    <div className="p-8 space-y-8 animate-fade-in max-w-7xl mx-auto">
+      {/* Back button */}
+      <div>
+        <Link to="/support-team" className="flex items-center gap-1.5 text-text-tertiary hover:text-text-primary font-bold text-sm transition-all group">
+          <svg className="w-5 h-5 transition-transform duration-200 group-hover:-translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Support Directory
+        </Link>
       </div>
 
-      {/* Main split grid: Assignments vs Context Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Left Column: Client list (Assigned checklist) */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-white border border-border-primary rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between border-b border-border-primary pb-4 mb-4">
-              <h2 className="text-lg font-bold text-text-primary">Client Assignments</h2>
-              <span className="px-2.5 py-1 bg-primary-50 rounded-lg text-xs font-bold text-primary-600">
-                {clients.length} Total
-              </span>
-            </div>
+      {/* Profile Card Header */}
+      <div className="bg-white border border-border-primary rounded-3xl p-6 shadow-sm flex flex-col md:flex-row items-center gap-6 relative overflow-hidden">
+        {/* Accent status bar */}
+        <div className={`absolute top-0 left-0 right-0 h-1.5 ${
+          member.status === 'online' ? 'bg-success-500' :
+          member.status === 'busy' ? 'bg-warning-500' :
+          'bg-slate-300'
+        }`}></div>
 
-            {clients.length === 0 ? (
-              <div className="py-12 text-center text-text-tertiary">
-                <p className="font-semibold text-sm">No clients assigned</p>
-                <p className="text-xs mt-1">Assignments are managed by administrators.</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                {clients.map((c) => (
-                  <div
-                    key={c._id}
-                    onClick={() => setSelectedClient(c)}
-                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all duration-200 ${
-                      selectedClient?._id === c._id
-                        ? 'bg-primary-50 border-primary-300 shadow-sm shadow-primary-500/5'
-                        : 'bg-bg-primary hover:bg-bg-secondary border-border-primary'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <h4 className={`font-bold text-sm ${selectedClient?._id === c._id ? 'text-primary-700' : 'text-text-primary'}`}>
-                        {c.name}
-                      </h4>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        c.status === 'active' ? 'bg-success-50 text-success-600' : 'bg-secondary-100 text-secondary-500'
-                      }`}>
-                        {c.status}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-2 text-xs text-text-secondary font-mono">
-                      <span>{c.phone}</span>
-                      <span className="font-sans text-text-tertiary">{c.product || 'No product'}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="relative">
+          {member.avatar ? (
+            <img
+              src={member.avatar}
+              alt={member.fullName}
+              className="w-24 h-24 rounded-2xl object-cover shadow-md border border-border-primary"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-3xl uppercase border border-primary-200 shadow-inner">
+              {member.fullName.charAt(0)}
+            </div>
+          )}
+          <span className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-4 border-white shadow-md flex items-center justify-center ${
+            member.status === 'online' ? 'bg-success-500' :
+            member.status === 'busy' ? 'bg-warning-500' :
+            'bg-slate-400'
+          }`}>
+            {member.status === 'online' && <span className="absolute w-2.5 h-2.5 bg-white rounded-full animate-ping"></span>}
+          </span>
         </div>
 
-        {/* Right Column: Premium Client Context Panel (Step 3) */}
-        <div className="lg:col-span-8">
-          {selectedClient ? (
-            <div className="bg-white border border-border-primary rounded-2xl p-6 lg:p-8 shadow-sm space-y-8">
-              
-              {/* Header inside Panel */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border-primary pb-6 gap-4">
-                <div>
-                  <span className="text-[10px] font-bold text-primary-500 uppercase tracking-widest">Client Context Workspace</span>
-                  <h2 className="text-2xl font-extrabold text-text-primary mt-1">{selectedClient.name}</h2>
-                  <p className="text-xs text-text-tertiary mt-1 font-mono">ID: {selectedClient._id}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* Outbound call button */}
-                  <button
-                    onClick={() => handleCallInitiate(selectedClient._id)}
-                    disabled={callingClientId === selectedClient._id}
-                    className={`inline-flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer ${
-                      callingClientId === selectedClient._id
-                        ? 'bg-primary-50 border border-primary-200 text-primary-400 cursor-wait'
-                        : 'bg-success-600 hover:bg-success-500 text-white shadow-success-600/10 hover:scale-102'
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    {callingClientId === selectedClient._id ? 'Calling Client...' : 'Initiate Outbound Call'}
-                  </button>
-                </div>
-              </div>
+        <div className="flex-1 min-w-0 text-center md:text-left space-y-2">
+          <div className="flex flex-col md:flex-row md:items-center gap-2.5">
+            <h1 className="text-2xl font-bold text-text-primary tracking-tight">{member.fullName}</h1>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold border self-center md:self-auto capitalize ${
+              member.status === 'online' ? 'bg-success-50 border-success-100 text-success-700' :
+              member.status === 'busy' ? 'bg-warning-50 border-warning-100 text-warning-700' :
+              'bg-slate-50 border-slate-200 text-slate-600'
+            }`}>
+              ● {member.status}
+            </span>
+          </div>
+          <p className="text-sm font-bold text-text-tertiary uppercase tracking-wider">
+            {member.designation || 'Specialist'} &bull; <span className="text-primary-700">{member.department || 'Success'}</span>
+          </p>
 
-              {/* Client Profile details */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-bg-secondary p-5 rounded-2xl border border-border-primary">
-                <div>
-                  <span className="text-xs font-bold text-text-tertiary block">Email Address</span>
-                  <span className="font-medium text-sm text-text-primary break-all mt-0.5 block">
-                    {selectedClient.email || '—'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-text-tertiary block">Outbound Telephony Phone</span>
-                  <span className="font-mono text-sm text-text-primary mt-0.5 block">
-                    {selectedClient.phone}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-text-tertiary block">Product Segment</span>
-                  <span className="font-medium text-sm text-text-primary mt-0.5 block">
-                    {selectedClient.product || '—'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-text-tertiary block">Primary Language</span>
-                  <span className="font-medium text-sm text-text-primary mt-0.5 block">
-                    {selectedClient.language === 'en' ? 'English (en-US)' : 'Hindi (hi-IN)'}
-                  </span>
-                </div>
-                <div className="md:col-span-2">
-                  <span className="text-xs font-bold text-text-tertiary block">Geographic Address</span>
-                  <span className="font-medium text-sm text-text-primary mt-0.5 block">
-                    {selectedClient.address || '—'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Step 3: Sentiment Reports & Escalations Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Sentiment Analytics */}
-                <div className="bg-bg-primary border border-border-primary p-5 rounded-2xl shadow-sm">
-                  <h3 className="text-sm font-bold text-text-primary border-b border-border-primary pb-2 mb-3">
-                    Sentiment & Health Report
-                  </h3>
-                  
-                  {clientCallHistory.length > 0 && clientCallHistory[0].sentiment ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-text-secondary">Recent Call Sentiment</span>
-                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${getSentimentBadge(clientCallHistory[0].sentiment)}`}>
-                          {clientCallHistory[0].sentiment.toUpperCase()}
-                        </span>
-                      </div>
-
-                      {clientCallHistory[0].satisfactionScore !== undefined && (
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs text-text-secondary">
-                            <span>Client Satisfaction Score</span>
-                            <span className="font-bold">{clientCallHistory[0].satisfactionScore} / 10</span>
-                          </div>
-                          {/* Progress bar */}
-                          <div className="w-full bg-bg-tertiary h-2 rounded-full overflow-hidden">
-                            <div 
-                              className="bg-primary-500 h-full transition-all"
-                              style={{ width: `${(clientCallHistory[0].satisfactionScore || 5) * 10}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {clientCallHistory[0].businessImpact && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-text-secondary">Business Churn Impact</span>
-                          <span className="font-bold text-text-primary uppercase">{clientCallHistory[0].businessImpact}</span>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-xs text-text-tertiary">
-                      No call history sentiment calculated yet. Trigger a call to fetch real-time sentiment metrics.
-                    </div>
-                  )}
-                </div>
-
-                {/* Escalation Control */}
-                <div className="bg-bg-primary border border-border-primary p-5 rounded-2xl shadow-sm flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-text-primary border-b border-border-primary pb-2 mb-3">
-                      Escalation Handler
-                    </h3>
-                    <p className="text-xs text-text-secondary mb-4 leading-relaxed">
-                      Escalate this client's profile if their sentiment deteriorates, requiring immediate human follow-ups.
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-text-tertiary uppercase block">Assigned Escalation Level</label>
-                    <select
-                      onChange={(e) => handleEscalationChange(e.target.value)}
-                      disabled={updatingEscalation}
-                      className="w-full px-3 py-2 bg-white border border-border-primary rounded-xl text-xs font-semibold focus:outline-none appearance-none cursor-pointer"
-                      defaultValue={selectedClient.notes?.includes('[ESCALATION: High') ? 'High' : selectedClient.notes?.includes('[ESCALATION: Critical') ? 'Critical' : 'Normal'}
-                    >
-                      <option value="Normal">Normal — Under AI Surveillance</option>
-                      <option value="High">High — Needs Operations Review</option>
-                      <option value="Critical">Critical — Require Immediate Callback</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* AI call summaries & Transcription block */}
-              <div className="bg-bg-primary border border-border-primary p-5 rounded-2xl shadow-sm space-y-4">
-                <h3 className="text-sm font-bold text-text-primary border-b border-border-primary pb-2 mb-3">
-                  AI Context Summary & Issues Captured
-                </h3>
-
-                {clientCallHistory.length > 0 && clientCallHistory[0].summary ? (
-                  <div className="space-y-4">
-                    <div>
-                      <span className="text-[10px] font-bold text-text-tertiary uppercase block mb-1">AI Summary</span>
-                      <p className="text-xs text-text-secondary leading-relaxed bg-bg-secondary p-3.5 rounded-xl border border-border-primary">
-                        {clientCallHistory[0].summary}
-                      </p>
-                    </div>
-
-                    {clientCallHistory[0].issues && clientCallHistory[0].issues.length > 0 && (
-                      <div>
-                        <span className="text-[10px] font-bold text-text-tertiary uppercase block mb-1">Issues Flags</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {clientCallHistory[0].issues.map((issue, idx) => (
-                            <span key={idx} className="px-2.5 py-1 bg-red-50 border border-red-200 rounded-lg text-[10px] font-bold text-red-600">
-                              {issue}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {clientCallHistory[0].actionItems && clientCallHistory[0].actionItems.length > 0 && (
-                      <div>
-                        <span className="text-[10px] font-bold text-text-tertiary uppercase block mb-1">Action Items Assigned</span>
-                        <ul className="list-disc list-inside text-xs text-text-secondary space-y-1 pl-1">
-                          {clientCallHistory[0].actionItems.map((item, idx) => (
-                            <li key={idx}>{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-xs text-text-tertiary bg-bg-secondary rounded-xl border border-dashed border-border-primary">
-                    No active call logs found or AI summaries generated. Initiate a call to trigger the telecommunication pipeline.
-                  </div>
-                )}
-              </div>
-
-              {/* Client historical communication logs (Step 2) */}
-              <div className="bg-bg-primary border border-border-primary p-5 rounded-2xl shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-border-primary pb-2 mb-3">
-                  <h3 className="text-sm font-bold text-text-primary">Communication History</h3>
-                  <span className="text-xs text-text-tertiary font-medium">Last 5 interactions</span>
-                </div>
-
-                {loadingCallHistory ? (
-                  <div className="flex items-center justify-center py-8">
-                    <svg className="w-6 h-6 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  </div>
-                ) : clientCallHistory.length === 0 ? (
-                  <p className="text-xs text-text-tertiary text-center py-6">
-                    No historical logs recorded.
-                  </p>
-                ) : (
-                  <div className="divide-y divide-border-primary">
-                    {clientCallHistory.map((call) => (
-                      <div key={call.id} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${
-                              call.status === 'recorded' || call.status === 'completed'
-                                ? 'bg-success-500'
-                                : call.status === 'failed'
-                                ? 'bg-danger-500'
-                                : 'bg-primary-500'
-                            }`} />
-                            <span className="text-xs font-bold text-text-primary capitalize">{call.status}</span>
-                            <span className="text-[10px] text-text-tertiary">· {new Date(call.date).toLocaleString()}</span>
-                          </div>
-                          {call.summary && (
-                            <p className="text-xs text-text-secondary line-clamp-1 mt-1 pl-4">
-                              {call.summary}
-                            </p>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          {call.duration && (
-                            <span className="text-xs font-mono text-text-tertiary">
-                              {call.duration}s
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-            </div>
-          ) : (
-            <div className="bg-white border border-border-primary rounded-2xl p-16 text-center shadow-sm flex flex-col items-center justify-center min-h-[500px]">
-              <div className="w-20 h-20 bg-bg-secondary rounded-2xl flex items-center justify-center mb-4">
-                <svg className="w-10 h-10 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-text-primary">No Client Selected</h3>
-              <p className="text-text-secondary mt-1">Select a client on the left column to view their live Context panel.</p>
+          {member.skills && member.skills.length > 0 && (
+            <div className="flex flex-wrap justify-center md:justify-start gap-1.5 pt-1">
+              {member.skills.map((s, i) => (
+                <span key={i} className="bg-bg-secondary text-text-secondary border border-border-primary px-2.5 py-0.5 rounded-lg text-xs font-semibold">
+                  {s}
+                </span>
+              ))}
             </div>
           )}
         </div>
 
+        {/* Corporate stats side block */}
+        <div className="bg-bg-secondary border border-border-primary p-4 rounded-2xl flex gap-6 text-center md:text-left">
+          <div>
+            <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">Assignments</p>
+            <h4 className="text-2xl font-bold text-text-primary mt-1">{assignedClients.length}</h4>
+          </div>
+          <div className="w-px bg-border-primary"></div>
+          <div>
+            <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">Live Calls</p>
+            <h4 className="text-2xl font-bold text-text-primary mt-1">
+              {allCalls.filter(c => c.clientId && assignedClients.some(ac => ac._id === (typeof c.clientId === 'object' ? c.clientId._id : c.clientId))).length}
+            </h4>
+          </div>
+        </div>
       </div>
+
+      {/* Split Workspace View */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left column: Active assignments list (Master) */}
+        <div className="lg:col-span-4 bg-white border border-border-primary rounded-3xl p-5 shadow-sm space-y-4">
+          <h2 className="text-lg font-bold text-text-primary border-b border-border-primary pb-3">
+            Corporate Client Directory ({assignedClients.length})
+          </h2>
+          {assignedClients.length === 0 ? (
+            <div className="py-12 text-center text-text-tertiary space-y-2">
+              <svg className="w-12 h-12 mx-auto text-text-tertiary opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <h5 className="font-bold text-text-secondary text-sm">No clients assigned</h5>
+              <p className="text-xs">Use the support workspace to assign corporate clients to this agent.</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+              {assignedClients.map((client) => {
+                const isSelected = selectedClient?._id === client._id;
+                return (
+                  <div
+                    key={client._id}
+                    onClick={() => handleSelectClient(client)}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex justify-between items-center group ${
+                      isSelected 
+                        ? 'bg-primary-50/50 border-primary-300 shadow-sm' 
+                        : 'bg-white border-border-primary hover:border-primary-200'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <h4 className={`text-sm font-bold text-text-primary truncate ${isSelected ? 'text-primary-700' : ''}`}>
+                        {client.name}
+                      </h4>
+                      <p className="text-xs text-text-tertiary font-semibold truncate mt-0.5">
+                        📦 {client.product || 'Enterprise Care'}
+                      </p>
+                    </div>
+                    <svg className={`w-4 h-4 text-text-tertiary transition-transform duration-200 ${
+                      isSelected ? 'text-primary-600 translate-x-1' : 'group-hover:translate-x-1'
+                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Right column: Client Context Panel (Detail) */}
+        <div className="lg:col-span-8 bg-white border border-border-primary rounded-3xl p-6 shadow-sm min-h-[70vh] flex flex-col justify-between">
+          {!selectedClient ? (
+            <div className="m-auto text-center py-20 text-text-tertiary max-w-sm space-y-3">
+              <div className="w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center text-primary-500 mx-auto border border-primary-100 shadow-sm">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-text-primary">Corporate Customer Success Panel</h3>
+              <p className="text-sm">Select one of the assigned clients from the left directory to display their custom AI telemetry, summaries, and escalated activities.</p>
+            </div>
+          ) : (
+            <div className="space-y-6 flex-1 flex flex-col justify-between">
+              <div>
+                {/* 1. Client Context Mini-Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border-primary pb-5 gap-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-text-primary tracking-tight">{selectedClient.name}</h2>
+                    <p className="text-xs text-text-tertiary font-semibold mt-1">
+                      📞 {selectedClient.phone} &bull; 📧 {selectedClient.email || 'No email registered'}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleInitiateCall(selectedClient._id)}
+                      className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-md shadow-primary-500/10 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                      Trigger outbound call
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Client Analytics Dashboard Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-5">
+                  {/* Sentiment Progress Card */}
+                  <div className="bg-bg-secondary border border-border-primary p-4 rounded-2xl space-y-2 shadow-inner">
+                    <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">AI Sentiment Profile</p>
+                    {clientCalls.length === 0 ? (
+                      <p className="text-xs text-text-tertiary">No interaction telemetry</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span className="text-success-600">Pos ({sentimentStats.positive}%)</span>
+                          <span className="text-danger-600">Neg ({sentimentStats.negative}%)</span>
+                        </div>
+                        {/* Tri-color Progress Bar */}
+                        <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden flex">
+                          <div style={{ width: `${sentimentStats.positive}%` }} className="bg-success-500 h-full"></div>
+                          <div style={{ width: `${sentimentStats.neutral}%` }} className="bg-slate-400 h-full"></div>
+                          <div style={{ width: `${sentimentStats.negative}%` }} className="bg-danger-500 h-full"></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Call Volume Statistics */}
+                  <div className="bg-bg-secondary border border-border-primary p-4 rounded-2xl space-y-1 shadow-inner">
+                    <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">Call interactions</p>
+                    <h3 className="text-xl font-black text-text-primary mt-0.5">{clientCalls.length} calls</h3>
+                    <p className="text-[10px] text-text-tertiary font-bold">Total voice engagements</p>
+                  </div>
+
+                  {/* Last Interactions Tracker */}
+                  <div className="bg-bg-secondary border border-border-primary p-4 rounded-2xl space-y-1 shadow-inner">
+                    <p className="text-xs font-bold text-text-tertiary uppercase tracking-wider">Last call date</p>
+                    <h3 className="text-base font-bold text-text-primary truncate mt-0.5">
+                      {selectedClient.lastCallAt 
+                        ? new Date(selectedClient.lastCallAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) 
+                        : 'Never contacted'}
+                    </h3>
+                    <p className="text-[10px] text-text-tertiary font-bold">Telephony timestamp</p>
+                  </div>
+                </div>
+
+                {/* 3. Navigation Tabs within Context */}
+                <div className="flex border-b border-border-primary mt-6">
+                  <button
+                    onClick={() => setActiveTab('summary')}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                      activeTab === 'summary' 
+                        ? 'border-primary-500 text-primary-600' 
+                        : 'border-transparent text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    AI Call Logs ({clientCalls.length})
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('escalations')}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                      activeTab === 'escalations' 
+                        ? 'border-danger-500 text-danger-600' 
+                        : 'border-transparent text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    Escalations & Issues ({escalatedCalls.length})
+                  </button>
+                </div>
+
+                {/* 4. Tab Contents */}
+                <div className="pt-4 flex-1">
+                  {/* TAB 1: CALL LOGS */}
+                  {activeTab === 'summary' && (
+                    <div className="space-y-4">
+                      {clientCalls.length === 0 ? (
+                        <p className="text-sm text-text-tertiary text-center py-8">No AI Call interaction logs found for this client.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {clientCalls.map((call) => (
+                            <div
+                              key={call.id}
+                              className="border border-border-primary rounded-2xl p-4 transition-all hover:border-primary-200 bg-white"
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-primary pb-2.5">
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-2.5 h-2.5 rounded-full ${
+                                    call.status === 'recorded' ? 'bg-success-500' :
+                                    call.status === 'failed' ? 'bg-danger-500' :
+                                    'bg-primary-500 animate-pulse'
+                                  }`}></span>
+                                  <span className="text-xs font-bold text-text-primary capitalize">{call.status}</span>
+                                  <span className="text-xs text-text-tertiary">
+                                    {new Date(call.date).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase border ${
+                                  call.sentiment?.toLowerCase() === 'positive' ? 'bg-success-50 border-success-100 text-success-700' :
+                                  call.sentiment?.toLowerCase() === 'negative' ? 'bg-danger-50 border-danger-100 text-danger-700' :
+                                  'bg-slate-50 border-slate-100 text-slate-700'
+                                }`}>
+                                  {call.sentiment || 'neutral'}
+                                </span>
+                              </div>
+
+                              <div className="mt-3 space-y-2">
+                                {call.summary ? (
+                                  <p className="text-xs font-medium text-text-secondary leading-relaxed bg-bg-secondary p-3 rounded-xl border border-border-primary">
+                                    🤖 <strong>AI Summary:</strong> {call.summary}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs italic text-text-tertiary">Call in queue or completed without recording transcript.</p>
+                                )}
+
+                                {/* Action items & playback */}
+                                <div className="flex flex-wrap gap-2 pt-1.5 items-center justify-between">
+                                  {call.actionItems && call.actionItems.length > 0 && (
+                                    <span className="text-[10px] font-bold text-primary-700 bg-primary-50 px-2 py-0.5 rounded-md">
+                                      📝 {call.actionItems.length} Action Items
+                                    </span>
+                                  )}
+                                  
+                                  {call.recordingUrl && (
+                                    <audio 
+                                      src={call.recordingUrl} 
+                                      controls 
+                                      className="h-7 w-44 scale-95 opacity-80 hover:opacity-100 transition-opacity" 
+                                    />
+                                  )}
+
+                                  <button
+                                    onClick={() => handleShowCallDetails(call)}
+                                    className="text-xs text-primary-600 hover:text-primary-700 font-bold ml-auto hover:underline cursor-pointer"
+                                  >
+                                    View Full Analysis &rarr;
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* TAB 2: ESCALATIONS */}
+                  {activeTab === 'escalations' && (
+                    <div className="space-y-4">
+                      {escalatedCalls.length === 0 ? (
+                        <div className="bg-success-50 border border-success-100 text-success-700 p-5 rounded-2xl text-center text-sm font-semibold">
+                          🎉 Perfect Health score. No AI issues or escalations registered for this account!
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {escalatedCalls.map((call) => (
+                            <div
+                              key={call.id}
+                              className="border border-danger-100 rounded-2xl p-4 bg-danger-50/20 space-y-2"
+                            >
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="font-bold text-danger-700 uppercase tracking-wide">⚠️ AI Escalation Event</span>
+                                <span className="text-text-tertiary">
+                                  {new Date(call.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </span>
+                              </div>
+                              <div className="space-y-1.5">
+                                <p className="text-xs text-text-primary font-bold">Issues Identified:</p>
+                                <ul className="list-disc pl-4 text-xs text-text-secondary space-y-1">
+                                  {call.issues.map((issue, idx) => (
+                                    <li key={idx} className="font-medium text-danger-800">{issue}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                              {call.actionItems && call.actionItems.length > 0 && (
+                                <div className="space-y-1 mt-2 pt-2 border-t border-danger-100/50">
+                                  <p className="text-xs text-text-primary font-bold">Recommended Mitigation Steps:</p>
+                                  <ul className="list-decimal pl-4 text-xs text-text-secondary space-y-1">
+                                    {call.actionItems.map((item, idx) => (
+                                      <li key={idx} className="font-medium">{item}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* FULL CALL ANALYSIS DIALOG (MODAL) */}
+      {selectedCallDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl border border-border-primary animate-scale-in">
+            {/* Header */}
+            <div className="p-6 border-b border-border-primary flex items-center justify-between bg-bg-secondary">
+              <div>
+                <h3 className="text-lg font-bold text-text-primary">AI Telemetric Call Audit</h3>
+                <p className="text-xs text-text-tertiary font-semibold mt-0.5">
+                  Call Date: {new Date(selectedCallDetails.date).toLocaleString()}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedCallDetails(null)}
+                className="text-text-tertiary hover:text-text-primary p-2 hover:bg-bg-tertiary rounded-xl transition-all cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Scrollable details contents */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Top Meta info */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-bg-secondary p-3 rounded-xl border border-border-primary text-center">
+                  <p className="text-[10px] font-bold text-text-tertiary uppercase">Sentiment</p>
+                  <span className="text-xs font-bold text-primary-700 capitalize mt-1 inline-block">
+                    {selectedCallDetails.sentiment || 'neutral'}
+                  </span>
+                </div>
+                <div className="bg-bg-secondary p-3 rounded-xl border border-border-primary text-center">
+                  <p className="text-[10px] font-bold text-text-tertiary uppercase">Score</p>
+                  <span className="text-xs font-bold text-text-primary mt-1 inline-block">
+                    ⭐ {selectedCallDetails.satisfactionScore || 5} / 10
+                  </span>
+                </div>
+                <div className="bg-bg-secondary p-3 rounded-xl border border-border-primary text-center">
+                  <p className="text-[10px] font-bold text-text-tertiary uppercase">Duration</p>
+                  <span className="text-xs font-semibold text-text-primary mt-1 inline-block">
+                    ⏱️ {selectedCallDetails.duration} seconds
+                  </span>
+                </div>
+                <div className="bg-bg-secondary p-3 rounded-xl border border-border-primary text-center">
+                  <p className="text-[10px] font-bold text-text-tertiary uppercase">Impact</p>
+                  <span className="text-xs font-bold text-warning-700 capitalize mt-1 inline-block">
+                    {selectedCallDetails.businessImpact || 'Medium'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold text-text-secondary uppercase">AI summary analysis</h4>
+                <p className="text-xs font-medium text-text-primary leading-relaxed bg-bg-secondary border border-border-primary p-4 rounded-2xl">
+                  {selectedCallDetails.summary || 'No summary generated.'}
+                </p>
+              </div>
+
+              {/* Action items */}
+              {selectedCallDetails.actionItems && selectedCallDetails.actionItems.length > 0 && (
+                <div className="space-y-1.5">
+                  <h4 className="text-xs font-bold text-text-secondary uppercase">Action Items & Deliverables</h4>
+                  <ul className="list-decimal pl-4 text-xs text-text-secondary space-y-1 bg-bg-secondary border border-border-primary p-4 rounded-2xl">
+                    {selectedCallDetails.actionItems.map((item, idx) => (
+                      <li key={idx} className="font-semibold text-text-primary">{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Transcript */}
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold text-text-secondary uppercase">Conversation Transcript</h4>
+                <div className="bg-bg-secondary border border-border-primary p-4 rounded-2xl max-h-48 overflow-y-auto space-y-3 font-mono text-[11px] leading-relaxed">
+                  {selectedCallDetails.transcript ? (
+                    selectedCallDetails.transcript.split('\n').map((line, idx) => {
+                      const isClient = line.startsWith('Client:');
+                      return (
+                        <p key={idx} className={`${isClient ? 'text-primary-700' : 'text-text-secondary font-semibold'}`}>
+                          {line}
+                        </p>
+                      );
+                    })
+                  ) : (
+                    <p className="text-text-tertiary italic">Transcript not recorded or processing.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Actions footer */}
+            <div className="p-6 border-t border-border-primary bg-bg-secondary rounded-b-3xl flex justify-end">
+              <button
+                onClick={() => setSelectedCallDetails(null)}
+                className="px-6 py-2.5 bg-white border border-border-primary hover:bg-bg-tertiary text-text-secondary font-bold text-xs rounded-xl transition-all cursor-pointer active:scale-95"
+              >
+                Close Audit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
