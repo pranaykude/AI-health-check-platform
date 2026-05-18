@@ -119,7 +119,7 @@ exports.getClientConversations = async (req, res) => {
           lastMessageAt: new Date()
         });
       }
-      
+
       rooms = await Conversation.find({ clientReference: clientId })
         .populate('participants', 'fullName avatar role status')
         .populate('clientReference', 'name product');

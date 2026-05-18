@@ -88,6 +88,8 @@ app.use('/api/v1/test-ai', testAIRoute);
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/support-members', supportMemberRoutes);
 app.use('/api/v1/chat', chatRoutes);
+const scheduleRoutes = require('./routes/scheduleRoutes');
+app.use('/api/v1/schedules', scheduleRoutes);
 app.get('/api/v1/metrics', jobController.getMetrics);
 
 // Compatibility route for Frontend Dashboard health checks
@@ -124,4 +126,8 @@ server.listen(PORT, () => {
   logger.info(`Server running on http://localhost:${PORT}`);
   logger.info(`API Docs: http://localhost:${PORT}/api/v1/health`);
   logger.info(`Environment: ${process.env.NODE_ENV}`);
+  
+  // Start background jobs
+  const { startScheduler } = require('./jobs/scheduler');
+  startScheduler();
 });

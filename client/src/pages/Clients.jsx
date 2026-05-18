@@ -4,6 +4,8 @@ import { triggerCall } from '../services/callService';
 import ClientForm from '../components/ClientForm';
 import DeleteConfirm from '../components/DeleteConfirm';
 import ImportModal from '../components/ImportModal';
+import ScheduleModal from '../components/ScheduleModal';
+import { createSchedule } from '../api/scheduleApi';
 
 export default function Clients() {
   const [clients, setClients] = useState([]);
@@ -21,6 +23,7 @@ export default function Clients() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [callingId, setCallingId] = useState(null);
+  const [scheduleTarget, setScheduleTarget] = useState(null);
 
   // Toast
   const [toast, setToast] = useState(null);
@@ -108,6 +111,18 @@ export default function Clients() {
       showToast('Something went wrong', 'error');
     } finally {
       setCallingId(null);
+    }
+  };
+
+  const handleSchedule = async (scheduleData) => {
+    try {
+      await createSchedule({
+        clientId: scheduleTarget._id,
+        ...scheduleData
+      });
+      showToast('Call scheduled successfully');
+    } catch (err) {
+      showToast('Failed to schedule call', 'error');
     }
   };
 
@@ -307,6 +322,15 @@ export default function Clients() {
                           {callingId === client._id ? 'Calling...' : 'Call Now'}
                         </button>
                         <button
+                          onClick={() => setScheduleTarget(client)}
+                          className="flex items-center gap-1.5 p-2 rounded-lg text-primary-400 hover:text-primary-600 hover:bg-primary-50 transition-all duration-200 font-medium"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Schedule
+                        </button>
+                        <button
                           onClick={() => openEdit(client)}
                           className="p-2 rounded-lg text-text-tertiary hover:text-primary-600 hover:bg-primary-50 transition-all duration-200"
                         >
@@ -374,6 +398,13 @@ export default function Clients() {
         onConfirm={handleDelete}
         clientName={deleteTarget?.name}
         deleting={deleting}
+      />
+
+      <ScheduleModal
+        isOpen={!!scheduleTarget}
+        onClose={() => setScheduleTarget(null)}
+        onConfirm={handleSchedule}
+        clientName={scheduleTarget?.name}
       />
     </div>
   );

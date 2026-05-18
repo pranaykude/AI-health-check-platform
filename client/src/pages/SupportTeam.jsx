@@ -49,7 +49,7 @@ export default function SupportTeam() {
         clientApi.getClients({ limit: 1000 })
       ]);
       setMembers(membersRes.data || []);
-      setClients(clientsRes.data || []);
+      setClients(clientsRes.data?.clients || []);
     } catch (err) {
       setError(err.message || 'Failed to load support team directory');
     } finally {
