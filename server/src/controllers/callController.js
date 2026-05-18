@@ -179,6 +179,9 @@ exports.getCalls = async (req, res) => {
     if (req.query.status) {
       filter.status = req.query.status;
     }
+    if (req.query.clientId) {
+      filter.clientId = req.query.clientId;
+    }
 
     const total = await Call.countDocuments(filter);
     const calls = await Call.find(filter)

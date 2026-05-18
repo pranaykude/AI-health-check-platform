@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getSupportMembers } from '../api/supportMemberApi';
 
 const INITIAL_FORM = {
   name: '',
@@ -9,6 +10,8 @@ const INITIAL_FORM = {
   address: '',
   status: 'active',
   notes: '',
+  assignedSupportMember: '',
+  assignedDepartment: '',
 };
 
 export default function ClientForm({ isOpen, onClose, onSubmit, client }) {
@@ -17,6 +20,18 @@ export default function ClientForm({ isOpen, onClose, onSubmit, client }) {
   const [submitting, setSubmitting] = useState(false);
 
   const isEditing = !!client;
+
+  const [supportMembers, setSupportMembers] = useState([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      getSupportMembers({ limit: 100 })
+        .then((res) => {
+          setSupportMembers(res.data?.supportMembers || []);
+        })
+        .catch((err) => console.error('Error fetching support members for dropdown', err));
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (client) {
@@ -29,6 +44,8 @@ export default function ClientForm({ isOpen, onClose, onSubmit, client }) {
         address: client.address || '',
         status: client.status || 'active',
         notes: client.notes || '',
+        assignedSupportMember: client.assignedSupportMember?._id || client.assignedSupportMember || '',
+        assignedDepartment: client.assignedDepartment || '',
       });
     } else {
       setForm(INITIAL_FORM);
@@ -216,6 +233,36 @@ export default function ClientForm({ isOpen, onClose, onSubmit, client }) {
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
+            </div>
+          </div>
+
+          {/* Row: Support Agent + Department */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-1.5">Assigned Support Agent</label>
+              <select
+                value={form.assignedSupportMember}
+                onChange={(e) => handleChange('assignedSupportMember', e.target.value)}
+                className="w-full px-4 py-2.5 bg-white border border-border-primary rounded-xl text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 appearance-none cursor-pointer"
+              >
+                <option value="">Unassigned</option>
+                {supportMembers.map((member) => (
+                  <option key={member._id} value={member._id}>
+                    {member.fullName} ({member.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-1.5">Assigned Department</label>
+              <input
+                type="text"
+                value={form.assignedDepartment}
+                onChange={(e) => handleChange('assignedDepartment', e.target.value)}
+                placeholder="Healthcare AI, Onboarding, Operations..."
+                className="w-full px-4 py-2.5 bg-white border border-border-primary rounded-xl text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200"
+              />
             </div>
           </div>
 

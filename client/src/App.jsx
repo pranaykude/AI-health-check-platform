@@ -5,6 +5,8 @@ import Clients from './pages/Clients';
 import Calls from './pages/Calls';
 import CallLogs from './pages/CallLogs';
 import LiveActivity from './pages/LiveActivity';
+import SupportTeam from './pages/SupportTeam';
+import SupportMemberProfile from './pages/SupportMemberProfile';
 import Login from './pages/Login';
 import VerifyOtp from './pages/VerifyOtp';
 import { AuthProvider } from './context/AuthContext';
@@ -19,7 +21,7 @@ function App() {
           <Route path="/verify" element={<VerifyOtp />} />
           
           <Route path="/" element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute allowedRoles={['admin', 'manager', 'support', 'senior_support', 'technical_support', 'operations']}>
               <Layout />
             </ProtectedRoute>
           }>
@@ -27,6 +29,8 @@ function App() {
             <Route path="clients" element={<Clients />} />
             <Route path="calls" element={<Calls />} />
             <Route path="logs" element={<LiveActivity />} />
+            <Route path="support-team" element={<SupportTeam />} />
+            <Route path="support-team/:id" element={<SupportMemberProfile />} />
           </Route>
         </Routes>
       </Router>

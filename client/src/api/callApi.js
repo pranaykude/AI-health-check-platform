@@ -20,10 +20,10 @@ export const initiateCall = async (clientId) => {
  * Get call history with pagination and status filtering
  * GET /api/calls
  */
-export const getCallHistory = async (page = 1, status = '', limit = 20) => {
+export const getCallHistory = async (page = 1, status = '', limit = 20, clientId = '') => {
   try {
     const response = await axios.get(`${API_BASE}/api/v1/calls`, {
-      params: { page, status, limit }
+      params: { page, status, limit, clientId }
     });
     return response.data;
   } catch (error) {
