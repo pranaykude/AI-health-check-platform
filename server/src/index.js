@@ -79,6 +79,7 @@ app.get('/api/v1/health', async (req, res) => {
 const jobController = require('./controllers/jobController');
 
 const supportMemberRoutes = require('./routes/supportMemberRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 app.use('/api/v1/clients', clientRoutes);
 app.use('/api/v1/calls', callRoutes);
@@ -86,6 +87,7 @@ app.use('/api/v1/jobs', jobRoutes);
 app.use('/api/v1/test-ai', testAIRoute);
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/support-members', supportMemberRoutes);
+app.use('/api/v1/chat', chatRoutes);
 app.get('/api/v1/metrics', jobController.getMetrics);
 
 // Compatibility route for Frontend Dashboard health checks
@@ -108,8 +110,16 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // Start server
+const http = require('http');
+const socketService = require('./services/socketService');
+
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+// Initialize real-time Socket.IO coordination
+socketService.init(server);
+
+server.listen(PORT, () => {
   console.log(`[SERVER] Running on port ${PORT}`);
   logger.info(`Server running on http://localhost:${PORT}`);
   logger.info(`API Docs: http://localhost:${PORT}/api/v1/health`);

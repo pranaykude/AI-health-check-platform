@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import * as supportApi from '../api/supportMemberApi';
 import * as callApi from '../api/callApi';
+import * as chatApi from '../api/chatApi';
 
 export default function SupportMemberProfile() {
   const { id } = useParams();
@@ -14,15 +16,79 @@ export default function SupportMemberProfile() {
   // Active Client selection for Step 3 Context Panel
   const [selectedClient, setSelectedClient] = useState(null);
   const [clientCalls, setClientCalls] = useState([]);
-  const [loadingClientCalls, setLoadingClientCalls] = useState(false);
   const [selectedCallDetails, setSelectedCallDetails] = useState(null);
 
-  // Active Tab inside Client Context Panel
-  const [activeTab, setActiveTab] = useState('summary'); // summary, transcripts, escalations
+  // Active Tab inside Client Context Panel (summary, transcripts, escalations, chat, notes)
+  const [activeTab, setActiveTab] = useState('summary');
+
+  // Real-Time Socket/Chat States (Step 1, 3, 4)
+  const [clientRooms, setClientRooms] = useState([]);
+  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessageText, setNewMessageText] = useState('');
+  const [socket, setSocket] = useState(null);
+  const [typingUsers, setTypingUsers] = useState({}); // supportMemberId -> name
+  const [isTypingLocal, setIsTypingLocal] = useState(false);
+
+  // Secure Internal Private Notes (Step 5)
+  const [internalNotes, setInternalNotes] = useState([]);
+  const [newNoteText, setNewNoteText] = useState('');
+  const [newNoteType, setNewNoteType] = useState('general'); // general, escalation, billing, technical
+  const [savingNote, setSavingNote] = useState(false);
+
+  const messageEndRef = useRef(null);
 
   useEffect(() => {
     fetchMemberData();
   }, [id]);
+
+  // Connect to real-time websocket coordination gateway on load
+  useEffect(() => {
+    if (!member) return;
+
+    // Connect using current HTTP host or environment config
+    const socketUrl = import.meta.env.VITE_API_URL || '';
+    const newSocket = io(socketUrl, {
+      withCredentials: true,
+      transports: ['websocket', 'polling']
+    });
+
+    newSocket.on('connect', () => {
+      console.log('[SOCKET] Webchat gateway link established');
+      newSocket.emit('auth', { supportMemberId: member._id });
+    });
+
+    // Handle new message arrival
+    newSocket.on('new_message', (msg) => {
+      // Only append if the message belongs to the currently active chat room
+      setMessages((prev) => {
+        if (prev.some(p => p._id === msg._id)) return prev;
+        return [...prev, msg];
+      });
+      scrollToBottom();
+    });
+
+    // Handle incoming typing indicators
+    newSocket.on('typing_status', ({ conversationId, supportMemberId, fullName, isTyping }) => {
+      setTypingUsers((prev) => ({
+        ...prev,
+        [supportMemberId]: isTyping ? fullName : null
+      }));
+    });
+
+    // Handle online agent updates
+    newSocket.on('presence_update', ({ supportMemberId, status }) => {
+      if (member && member._id === supportMemberId) {
+        setMember(prev => ({ ...prev, status }));
+      }
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [member?._id]);
 
   const fetchMemberData = async () => {
     setLoading(true);
@@ -53,15 +119,120 @@ export default function SupportMemberProfile() {
     }
   };
 
-  const handleSelectClient = (client, callsList = allCalls) => {
+  const handleSelectClient = async (client, callsList = allCalls) => {
     setSelectedClient(client);
     setSelectedCallDetails(null);
+    setSelectedRoom(null);
+    setMessages([]);
+    
     // Filter calls for this client
     const filtered = callsList.filter(call => {
       const callClientId = typeof call.clientId === 'object' ? call.clientId._id : call.clientId;
       return callClientId === client._id;
     });
     setClientCalls(filtered);
+
+    // Fetch client-specific real-time chat channels
+    try {
+      const roomsRes = await chatApi.getClientConversations(client._id);
+      setClientRooms(roomsRes.data || []);
+      // Auto-select standard API room
+      if (roomsRes.data && roomsRes.data.length > 0) {
+        handleSelectRoom(roomsRes.data[0]);
+      }
+    } catch (err) {
+      console.error('Failed loading room channels', err);
+    }
+
+    // Fetch secure client remarks/notes
+    try {
+      const notesRes = await chatApi.getInternalNotes(client._id);
+      setInternalNotes(notesRes.data || []);
+    } catch (err) {
+      console.error('Failed loading internal notes', err);
+    }
+  };
+
+  const handleSelectRoom = async (room) => {
+    if (socket && selectedRoom) {
+      socket.emit('leave_room', { conversationId: selectedRoom._id });
+    }
+
+    setSelectedRoom(room);
+    setMessages([]);
+
+    if (socket) {
+      socket.emit('join_room', { conversationId: room._id });
+    }
+
+    try {
+      const messagesRes = await chatApi.getMessages(room._id);
+      setMessages(messagesRes.data || []);
+      scrollToBottom();
+      
+      // Mark read
+      await chatApi.markRead(room._id);
+    } catch (err) {
+      console.error('Error fetching room message history', err);
+    }
+  };
+
+  const handleMessageChange = (e) => {
+    setNewMessageText(e.target.value);
+    
+    if (socket && selectedRoom && member) {
+      if (!isTypingLocal && e.target.value.trim().length > 0) {
+        setIsTypingLocal(true);
+        socket.emit('typing', { conversationId: selectedRoom._id, isTyping: true, fullName: member.fullName });
+      } else if (e.target.value.trim().length === 0) {
+        setIsTypingLocal(false);
+        socket.emit('typing', { conversationId: selectedRoom._id, isTyping: false, fullName: member.fullName });
+      }
+    }
+  };
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (!newMessageText.trim() || !socket || !selectedRoom) return;
+
+    // Reset local typing indicator
+    setIsTypingLocal(false);
+    socket.emit('typing', { conversationId: selectedRoom._id, isTyping: false, fullName: member.fullName });
+
+    // Send via socket
+    socket.emit('send_message', {
+      conversationId: selectedRoom._id,
+      message: newMessageText,
+      attachments: []
+    });
+
+    setNewMessageText('');
+  };
+
+  const handleSaveNote = async (e) => {
+    e.preventDefault();
+    if (!newNoteText.trim() || savingNote) return;
+
+    setSavingNote(true);
+    try {
+      const noteRes = await chatApi.createInternalNote(selectedClient._id, {
+        note: newNoteText,
+        type: newNoteType
+      });
+      setInternalNotes(prev => [noteRes.data, ...prev]);
+      setNewNoteText('');
+      setNewNoteType('general');
+    } catch (err) {
+      alert(err.message || 'Failed to save secure notes');
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const handleShowCallDetails = (call) => {
@@ -75,7 +246,6 @@ export default function SupportMemberProfile() {
     try {
       await callApi.initiateCall(clientId);
       alert('Outbound voice call process triggered successfully!');
-      // Reload calls in background
       setTimeout(async () => {
         const callsRes = await callApi.getCallHistory(1, '', 200);
         const callsList = callsRes.data?.calls || [];
@@ -89,7 +259,6 @@ export default function SupportMemberProfile() {
     }
   };
 
-  // Compute Client Sentiment Stats
   const getSentimentStats = () => {
     if (clientCalls.length === 0) return { positive: 0, neutral: 0, negative: 0 };
     let pos = 0, neu = 0, neg = 0;
@@ -108,9 +277,10 @@ export default function SupportMemberProfile() {
   };
 
   const sentimentStats = getSentimentStats();
-
-  // Find escalations/issues
   const escalatedCalls = clientCalls.filter(c => c.issues && c.issues.length > 0);
+
+  // Filter typing list to avoid rendering undefined strings
+  const activeTypers = Object.values(typingUsers).filter(Boolean);
 
   if (loading) {
     return (
@@ -347,7 +517,7 @@ export default function SupportMemberProfile() {
                 </div>
 
                 {/* 3. Navigation Tabs within Context */}
-                <div className="flex border-b border-border-primary mt-6">
+                <div className="flex flex-wrap border-b border-border-primary mt-6">
                   <button
                     onClick={() => setActiveTab('summary')}
                     className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
@@ -367,6 +537,26 @@ export default function SupportMemberProfile() {
                     }`}
                   >
                     Escalations & Issues ({escalatedCalls.length})
+                  </button>
+                  <button
+                    onClick={() => { setActiveTab('chat'); scrollToBottom(); }}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                      activeTab === 'chat' 
+                        ? 'border-primary-500 text-primary-600' 
+                        : 'border-transparent text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    💬 Real-Time Chat Channels
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('notes')}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
+                      activeTab === 'notes' 
+                        ? 'border-primary-500 text-primary-600' 
+                        : 'border-transparent text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    📝 Secure Staff Notes ({internalNotes.length})
                   </button>
                 </div>
 
@@ -487,6 +677,227 @@ export default function SupportMemberProfile() {
                           ))}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* TAB 3: REAL-TIME SUCCESS CHAT (Step 3 & 4) */}
+                  {activeTab === 'chat' && (
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-5 border border-border-primary rounded-3xl overflow-hidden bg-bg-secondary h-[50vh]">
+                      {/* Left: Chat Rooms list */}
+                      <div className="md:col-span-4 border-r border-border-primary bg-white p-3 space-y-2 overflow-y-auto">
+                        <h4 className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider px-2.5 pb-1">
+                          Rooms Channels
+                        </h4>
+                        {clientRooms.map((room) => {
+                          const isActive = selectedRoom?._id === room._id;
+                          return (
+                            <button
+                              key={room._id}
+                              onClick={() => handleSelectRoom(room)}
+                              className={`w-full text-left p-2.5 rounded-xl text-xs font-bold transition-all transition-colors truncate block cursor-pointer ${
+                                isActive 
+                                  ? 'bg-primary-50 text-primary-700 border border-primary-200' 
+                                  : 'hover:bg-bg-secondary text-text-secondary border border-transparent'
+                              }`}
+                            >
+                              {room.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Right: Message Workspace */}
+                      <div className="md:col-span-8 flex flex-col justify-between h-full bg-white relative">
+                        {selectedRoom ? (
+                          <>
+                            {/* Room Header */}
+                            <div className="px-4 py-3 border-b border-border-primary flex items-center justify-between bg-bg-secondary">
+                              <div>
+                                <h4 className="text-xs font-bold text-text-primary tracking-tight">
+                                  {selectedRoom.name}
+                                </h4>
+                                <p className="text-[9px] text-text-tertiary font-medium mt-0.5">
+                                  Topic: {selectedRoom.roomTopic || 'client discussion'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Message Log */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[30vh]">
+                              {messages.length === 0 ? (
+                                <p className="text-[11px] text-text-tertiary italic text-center py-6">
+                                  No messages. Send a message to start collaboration!
+                                </p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {messages.map((msg) => {
+                                    const isSelf = msg.sender?._id === member._id || msg.sender === member._id;
+                                    return (
+                                      <div 
+                                        key={msg._id} 
+                                        className={`flex gap-2.5 max-w-[85%] ${isSelf ? 'ml-auto flex-row-reverse' : ''}`}
+                                      >
+                                        <div className="flex flex-col space-y-1">
+                                          {/* Sender header */}
+                                          {!isSelf && (
+                                            <span className="text-[9px] font-bold text-text-tertiary uppercase">
+                                              {msg.sender?.fullName || 'Success Agent'} &bull; {msg.sender?.designation || 'Specialist'}
+                                            </span>
+                                          )}
+                                          <div className={`p-3 rounded-2xl text-xs leading-relaxed border ${
+                                            isSelf
+                                              ? 'bg-primary-600 border-primary-500 text-white rounded-tr-none'
+                                              : 'bg-bg-secondary border-border-primary text-text-primary rounded-tl-none'
+                                          }`}>
+                                            {msg.message}
+                                          </div>
+                                          <span className="text-[8px] text-text-tertiary self-end">
+                                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                  <div ref={messageEndRef} />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Typing Indicators & Message Input Form */}
+                            <div className="p-3 border-t border-border-primary bg-bg-secondary">
+                              {/* Animated Typing indicators */}
+                              {activeTypers.length > 0 && (
+                                <div className="text-[10px] text-text-tertiary font-semibold pb-1.5 animate-pulse">
+                                  ✍️ {activeTypers.join(', ')} is typing...
+                                </div>
+                              )}
+                              
+                              <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
+                                <input
+                                  type="text"
+                                  value={newMessageText}
+                                  onChange={handleMessageChange}
+                                  placeholder="Type internal team message..."
+                                  className="flex-1 bg-white border border-border-primary rounded-xl px-3 py-2 text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+                                />
+                                <button
+                                  type="submit"
+                                  className="bg-primary-600 hover:bg-primary-700 text-white p-2 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center justify-center cursor-pointer"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                  </svg>
+                                </button>
+                              </form>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="m-auto text-center p-6 text-text-tertiary max-w-xs space-y-2">
+                            <svg className="w-10 h-10 mx-auto opacity-40 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                            <h5 className="font-bold text-sm text-text-secondary">Select Chat Channel</h5>
+                            <p className="text-[11px]">Choose a client-specific discussion room from the left index panel to start real-time success chat.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 4: SECURE STAFF INTERNAL NOTES (Step 5) */}
+                  {activeTab === 'notes' && (
+                    <div className="space-y-6">
+                      {/* Notes Submit Form */}
+                      <form onSubmit={handleSaveNote} className="bg-bg-secondary border border-border-primary p-4 rounded-2xl space-y-4 shadow-inner">
+                        <div>
+                          <label className="block text-xs font-bold text-text-primary uppercase tracking-wider mb-1.5">
+                            Create Secure Private Note
+                          </label>
+                          <textarea
+                            value={newNoteText}
+                            onChange={(e) => setNewNoteText(e.target.value)}
+                            rows={3}
+                            placeholder="Add private logs, onboarding obstacles, billing flags or technical metrics..."
+                            className="w-full bg-white border border-border-primary rounded-xl px-4 py-2.5 text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all resize-none"
+                          />
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-text-secondary">Note Category:</span>
+                            <select
+                              value={newNoteType}
+                              onChange={(e) => setNewNoteType(e.target.value)}
+                              className="px-3 py-1.5 bg-white border border-border-primary rounded-xl text-xs font-semibold text-text-primary cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+                            >
+                              <option value="general">General Success Note</option>
+                              <option value="escalation">Emergency Escalation Remark</option>
+                              <option value="billing">Billing Operations Record</option>
+                              <option value="technical">Technical Integration Flag</option>
+                            </select>
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={!newNoteText.trim() || savingNote}
+                            className="bg-primary-600 hover:bg-primary-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-md shadow-primary-500/10 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                          >
+                            {savingNote ? 'Saving Secure Note...' : 'Save Private Annotation'}
+                          </button>
+                        </div>
+                      </form>
+
+                      {/* Notes Log */}
+                      <div className="space-y-3">
+                        {internalNotes.length === 0 ? (
+                          <div className="text-center py-8 text-text-tertiary italic text-xs">
+                            No internal notes recorded. Use the form above to add a private note.
+                          </div>
+                        ) : (
+                          internalNotes.map((note) => (
+                            <div
+                              key={note._id}
+                              className={`border rounded-2xl p-4 transition-all bg-white relative overflow-hidden ${
+                                note.type === 'escalation' ? 'border-danger-100 bg-danger-50/10' :
+                                note.type === 'billing' ? 'border-warning-100 bg-warning-50/10' :
+                                note.type === 'technical' ? 'border-primary-100 bg-primary-50/10' :
+                                'border-border-primary hover:border-primary-200'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center gap-2 border-b border-border-primary/50 pb-2 mb-2">
+                                <div className="flex items-center gap-2">
+                                  {note.author?.avatar ? (
+                                    <img
+                                      src={note.author.avatar}
+                                      alt={note.author.fullName}
+                                      className="w-5 h-5 rounded-full object-cover border border-border-primary"
+                                    />
+                                  ) : (
+                                    <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-[9px] font-bold text-slate-700">
+                                      {note.author?.fullName?.charAt(0) || 'S'}
+                                    </div>
+                                  )}
+                                  <span className="text-[10px] font-bold text-text-primary">
+                                    {note.author?.fullName || 'Success Agent'} ({note.author?.role || 'Staff'})
+                                  </span>
+                                  <span className="text-[9px] text-text-tertiary">
+                                    &bull; {new Date(note.createdAt).toLocaleString()}
+                                  </span>
+                                </div>
+                                <span className={`text-[8px] font-black px-2 py-0.5 rounded-md uppercase border ${
+                                  note.type === 'escalation' ? 'bg-danger-50 border-danger-100 text-danger-700' :
+                                  note.type === 'billing' ? 'bg-warning-50 border-warning-100 text-warning-700' :
+                                  note.type === 'technical' ? 'bg-primary-50 border-primary-100 text-primary-700' :
+                                  'bg-slate-50 border-slate-100 text-slate-700'
+                                }`}>
+                                  {note.type}
+                                </span>
+                              </div>
+                              <p className="text-xs leading-relaxed text-text-secondary whitespace-pre-line font-medium">
+                                {note.note}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
