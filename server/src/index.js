@@ -81,6 +81,9 @@ const jobController = require('./controllers/jobController');
 const supportMemberRoutes = require('./routes/supportMemberRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 
+const scheduleRoutes = require('./routes/scheduleRoutes');
+const whatsappRoutes = require('./routes/whatsappRoutes');
+
 app.use('/api/v1/clients', clientRoutes);
 app.use('/api/v1/calls', callRoutes);
 app.use('/api/v1/jobs', jobRoutes);
@@ -88,7 +91,8 @@ app.use('/api/v1/test-ai', testAIRoute);
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/support-members', supportMemberRoutes);
 app.use('/api/v1/chat', chatRoutes);
-const scheduleRoutes = require('./routes/scheduleRoutes');
+app.use('/api/v1/whatsapp', whatsappRoutes);
+app.use('/webhook/whatsapp', whatsappRoutes);
 app.use('/api/v1/schedules', scheduleRoutes);
 app.get('/api/v1/metrics', jobController.getMetrics);
 

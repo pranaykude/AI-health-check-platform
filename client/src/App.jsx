@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import VerifyOtp from './pages/VerifyOtp';
 import SupportTeam from './pages/SupportTeam';
 import SupportMemberProfile from './pages/SupportMemberProfile';
+import Messages from './pages/Messages';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -30,6 +31,7 @@ function App() {
             <Route path="clients" element={<Clients />} />
             <Route path="scheduled-calls" element={<ScheduledCalls />} />
             <Route path="calls" element={<Calls />} />
+            <Route path="messages" element={<Messages />} />
             <Route path="logs" element={<LiveActivity />} />
             <Route path="support-team" element={<SupportTeam />} />
             <Route path="support-team/:id" element={<SupportMemberProfile />} />

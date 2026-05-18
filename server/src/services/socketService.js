@@ -229,8 +229,11 @@ const isUserOnline = (supportMemberId) => {
   return activeUsers.has(supportMemberId.toString());
 };
 
+const getIO = () => io;
+
 module.exports = {
   init,
   sendNotification,
-  isUserOnline
+  isUserOnline,
+  getIO
 };

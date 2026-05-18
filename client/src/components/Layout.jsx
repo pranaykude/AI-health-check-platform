@@ -1,5 +1,8 @@
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
+import io from 'socket.io-client';
+import axios from 'axios';
 
 const navItems = [
   {
@@ -26,6 +29,15 @@ const navItems = [
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
+    to: '/messages',
+    label: 'Messages',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
       </svg>
     ),
   },
@@ -60,6 +72,43 @@ const navItems = [
 
 export default function Layout() {
   const { logout } = useAuth();
+  const [whatsappUnreadTotal, setWhatsappUnreadTotal] = useState(0);
+
+  useEffect(() => {
+    // 1. Fetch initially
+    const fetchUnreadTotal = async () => {
+      try {
+        const response = await axios.get('/api/v1/whatsapp/conversations', { withCredentials: true });
+        if (response.data && response.data.success) {
+          const total = response.data.data.reduce((acc, curr) => acc + (curr.unreadCount || 0), 0);
+          setWhatsappUnreadTotal(total);
+        }
+      } catch (err) {
+        console.error('Error fetching unread totals:', err);
+      }
+    };
+
+    fetchUnreadTotal();
+
+    // 2. Connect socket to sync
+    const socket = io(window.location.origin, {
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],
+      withCredentials: true
+    });
+
+    socket.on('new_whatsapp_message', () => {
+      fetchUnreadTotal();
+    });
+
+    socket.on('whatsapp_conversation_updated', () => {
+      fetchUnreadTotal();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg-primary">
@@ -91,17 +140,24 @@ export default function Layout() {
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group ${
+                `flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group ${
                   isActive
                     ? 'bg-primary-50 text-primary-600 border border-primary-200'
                     : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
                 }`
               }
             >
-              <span className="transition-transform duration-200 group-hover:scale-110">
-                {item.icon}
-              </span>
-              {item.label}
+              <div className="flex items-center gap-3">
+                <span className="transition-transform duration-200 group-hover:scale-110">
+                  {item.icon}
+                </span>
+                {item.label}
+              </div>
+              {item.label === 'Messages' && whatsappUnreadTotal > 0 && (
+                <span className="bg-green-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                  {whatsappUnreadTotal}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
