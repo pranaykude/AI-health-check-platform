@@ -99,6 +99,15 @@ const clientSchema = new mongoose.Schema(
       maxlength: [1000, 'Notes cannot exceed 1000 characters'],
       default: '',
     },
+    assignedSupportMember: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SupportMember',
+      default: null,
+    },
+    assignedDepartment: {
+      type: String,
+      default: '',
+    },
   },
   {
     timestamps: true,
@@ -121,6 +130,7 @@ clientSchema.pre('save', function (next) {
 
 // Indexes for performance
 clientSchema.index({ status: 1 });
+clientSchema.index({ assignedSupportMember: 1 });
 clientSchema.index(
   { name: 'text', phone: 'text', product: 'text' },
   { default_language: 'none', language_override: 'language' }

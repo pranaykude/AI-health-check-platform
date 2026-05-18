@@ -26,7 +26,7 @@ const normalizePhone = (phone) => {
 // @route   POST /api/v1/clients
 const createClient = async (req, res, next) => {
   try {
-    const { name, phone, language, product, email, address, status, notes } = req.body;
+    const { name, phone, language, product, email, address, status, notes, assignedSupportMember, assignedDepartment } = req.body;
 
     const client = await Client.create({
       name,
@@ -37,7 +37,18 @@ const createClient = async (req, res, next) => {
       address,
       status,
       notes,
+      assignedSupportMember: assignedSupportMember || null,
+      assignedDepartment: assignedDepartment || '',
     });
+
+    // Two-way sync: Add client to SupportMember's assigned list
+    if (assignedSupportMember) {
+      const SupportMember = require('../models/SupportMember');
+      await SupportMember.findByIdAndUpdate(
+        assignedSupportMember,
+        { $addToSet: { assignedClients: client._id } }
+      );
+    }
 
     return sendSuccess(res, client, 'Client created successfully', 201);
   } catch (error) {
@@ -123,7 +134,7 @@ const getClient = async (req, res, next) => {
 // @route   PUT /api/v1/clients/:id
 const updateClient = async (req, res, next) => {
   try {
-    const { name, phone, language, product, email, address, status, notes } = req.body;
+    const { name, phone, language, product, email, address, status, notes, assignedSupportMember, assignedDepartment } = req.body;
 
     const client = await Client.findById(req.params.id);
 
@@ -132,6 +143,9 @@ const updateClient = async (req, res, next) => {
       error.statusCode = 404;
       throw error;
     }
+
+    // Keep track of old support member for sync
+    const oldSupportMemberId = client.assignedSupportMember ? client.assignedSupportMember.toString() : null;
 
     // Update only provided fields
     if (name !== undefined) client.name = name;
@@ -142,8 +156,35 @@ const updateClient = async (req, res, next) => {
     if (address !== undefined) client.address = address;
     if (status !== undefined) client.status = status;
     if (notes !== undefined) client.notes = notes;
+    if (assignedSupportMember !== undefined) {
+      client.assignedSupportMember = assignedSupportMember === '' ? null : assignedSupportMember;
+    }
+    if (assignedDepartment !== undefined) {
+      client.assignedDepartment = assignedDepartment;
+    }
 
     const updatedClient = await client.save();
+
+    // Two-way sync on SupportMember
+    const newSupportMemberId = client.assignedSupportMember ? client.assignedSupportMember.toString() : null;
+    if (assignedSupportMember !== undefined && oldSupportMemberId !== newSupportMemberId) {
+      const SupportMember = require('../models/SupportMember');
+      
+      // Remove client from old support member
+      if (oldSupportMemberId) {
+        await SupportMember.findByIdAndUpdate(
+          oldSupportMemberId,
+          { $pull: { assignedClients: client._id } }
+        );
+      }
+      // Add client to new support member
+      if (newSupportMemberId) {
+        await SupportMember.findByIdAndUpdate(
+          newSupportMemberId,
+          { $addToSet: { assignedClients: client._id } }
+        );
+      }
+    }
 
     return sendSuccess(res, updatedClient, 'Client updated successfully');
   } catch (error) {

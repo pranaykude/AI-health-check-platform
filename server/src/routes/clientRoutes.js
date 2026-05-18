@@ -59,6 +59,19 @@ const validateClient = [
     .trim()
     .isLength({ max: 1000 })
     .withMessage('Notes cannot exceed 1000 characters'),
+  body('assignedSupportMember')
+    .optional()
+    .custom((value) => {
+      if (value === '' || value === null) return true;
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(value)) {
+        throw new Error('Invalid Support Member ID');
+      }
+      return true;
+    }),
+  body('assignedDepartment')
+    .optional()
+    .trim(),
 ];
 
 const validateUpdateClient = [
@@ -107,6 +120,19 @@ const validateUpdateClient = [
     .trim()
     .isLength({ max: 1000 })
     .withMessage('Notes cannot exceed 1000 characters'),
+  body('assignedSupportMember')
+    .optional()
+    .custom((value) => {
+      if (value === '' || value === null) return true;
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(value)) {
+        throw new Error('Invalid Support Member ID');
+      }
+      return true;
+    }),
+  body('assignedDepartment')
+    .optional()
+    .trim(),
 ];
 
 const { sendError } = require('../utils/response');
