@@ -312,24 +312,26 @@ const Messages = () => {
       {activeConversation ? (
         <div className="flex-1 flex flex-col bg-bg-primary">
           
-          {/* Header */}
-          <div className="p-4 border-b border-border-color bg-bg-secondary flex items-center justify-between shadow-sm">
+          {/* Polished Header */}
+          <div className="px-6 py-4 border-b border-border-color bg-bg-secondary flex items-center justify-between shadow-sm relative z-10">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 font-bold text-sm border border-green-500/30">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-green-500/20 to-emerald-600/20 flex items-center justify-center text-green-600 font-bold text-sm border border-green-500/20 shadow-inner">
                 {activeConversation.client?.name ? activeConversation.client.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?'}
               </div>
               <div>
-                <div className="font-bold text-text-primary flex items-center gap-1.5">
+                <div className="font-bold text-text-primary text-base flex items-center gap-1.5 leading-tight">
                   {activeConversation.client?.name}
                   {/* Verified checkmark badge */}
-                  <svg className="w-4 h-4 text-green-500 fill-current" viewBox="0 0 24 24" title="Verified WhatsApp Number">
-                    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                  </svg>
+                  <span className="text-green-500 hover:scale-110 transition-transform cursor-pointer" title="Verified WhatsApp Number">
+                    <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                  </span>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5 text-xs">
-                  <span className="text-text-secondary font-semibold font-mono">{activeConversation.whatsappNumber}</span>
-                  <span className="text-text-secondary">•</span>
-                  <span className="flex items-center gap-1 text-green-500 font-bold">
+                <div className="flex items-center gap-2 mt-1 text-xs">
+                  <span className="text-text-secondary font-semibold font-mono bg-bg-primary px-2 py-0.5 rounded border border-border-color">{activeConversation.whatsappNumber}</span>
+                  <span className="text-text-tertiary">•</span>
+                  <span className="flex items-center gap-1 text-green-500 font-bold bg-green-500/10 px-2 py-0.5 rounded-full text-[10px]">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
                     Online
                   </span>
@@ -340,7 +342,7 @@ const Messages = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => triggerClientCall(activeConversation.client)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-lg text-xs font-bold hover:shadow-md transition-all duration-200"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-xl text-xs font-extrabold hover:shadow-lg transition-all duration-300 active:scale-95 shadow-md"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -350,15 +352,22 @@ const Messages = () => {
             </div>
           </div>
 
-          {/* Scrollable Chat Area */}
-          <div className="flex-1 p-6 overflow-y-auto bg-bg-primary flex flex-col gap-4 relative" style={{
-            backgroundImage: `radial-gradient(var(--border-color) 1px, transparent 0)`,
-            backgroundSize: '24px 24px'
-          }}>
+          {/* Premium Chat Container */}
+          <div className="flex-1 px-4 sm:px-8 py-6 overflow-y-auto bg-bg-primary flex flex-col gap-3 relative">
             
-            {/* 24 hour warning notification banner */}
-            <div className="mx-auto bg-green-500/10 text-green-600 border border-green-500/20 px-4 py-2.5 rounded-xl text-xs max-w-lg text-center font-bold shadow-sm">
-              💬 24-Hour Messaging Window Active: Free-form text communication with this client is fully unlocked.
+            {/* End-to-End Encryption / 24h Window Badge */}
+            <div className="mx-auto flex flex-col items-center gap-2 mb-6 animate-fade-in">
+              <div className="bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border border-yellow-500/20 px-4 py-1.5 rounded-lg text-[11px] font-medium shadow-sm max-w-sm text-center">
+                <span className="inline-block mr-1">🔒</span> 
+                Messages are securely routed via Meta Business API. 24-hour free-form chat window is currently active.
+              </div>
+            </div>
+
+            {/* Date separator divider */}
+            <div className="flex items-center justify-center my-2">
+              <span className="text-[10px] text-text-tertiary bg-bg-secondary px-3 py-1 rounded-md font-bold shadow-sm uppercase tracking-wider border border-border-color/50">
+                Today
+              </span>
             </div>
 
             {messages.map((msg, index) => {
@@ -367,108 +376,102 @@ const Messages = () => {
               return (
                 <div
                   key={msg._id || index}
-                  className={`flex flex-col max-w-[70%] ${isOutbound ? 'self-end items-end' : 'self-start items-start'}`}
+                  className={`flex flex-col max-w-[75%] md:max-w-[65%] ${isOutbound ? 'self-end' : 'self-start'} group`}
                 >
-                  <div className={`p-3.5 rounded-2xl shadow-sm text-sm ${
+                  {/* Clean Modern Bubble */}
+                  <div className={`px-4 py-2.5 shadow-sm text-sm relative transition-all duration-200 hover:shadow-md ${
                     isOutbound 
-                      ? 'bg-green-600 text-white rounded-tr-none' 
-                      : 'bg-bg-secondary text-text-primary rounded-tl-none border border-border-color'
+                      ? 'bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl rounded-tr-sm' 
+                      : 'bg-white dark:bg-[#1f2937] text-text-primary rounded-2xl rounded-tl-sm border border-black/5 dark:border-white/5'
                   }`}>
-                    <p className="whitespace-pre-wrap leading-relaxed">{msg.body}</p>
-                    
-                    <div className="flex items-center justify-end gap-1 mt-1.5 text-[9px] opacity-75">
-                      <span>{formatTime(msg.createdAt)}</span>
-                      {isOutbound && (
-                        <span>
-                          {msg.status === 'sent' && (
-                            <svg className="w-3.5 h-3.5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                          {msg.status === 'delivered' && (
-                            <div className="flex">
-                              <svg className="w-3.5 h-3.5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <div className="flex flex-col gap-1">
+                      <p className="whitespace-pre-wrap leading-relaxed font-medium text-[14px] md:text-[15px]">{msg.body}</p>
+                      
+                      <div className={`flex items-center justify-end gap-1 text-[10px] font-medium ${isOutbound ? 'text-green-100' : 'text-text-tertiary'}`}>
+                        <span>{formatTime(msg.createdAt)}</span>
+                        {isOutbound && (
+                          <span className="inline-flex items-center ml-0.5">
+                            {msg.status === 'sent' && (
+                              <svg className="w-3.5 h-3.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                               </svg>
-                              <svg className="w-3.5 h-3.5 text-white/70 -ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                            </div>
-                          )}
-                          {msg.status === 'read' && (
-                            <div className="flex">
-                              <svg className="w-3.5 h-3.5 text-blue-300 fill-current" viewBox="0 0 24 24">
-                                <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                              </svg>
-                              <svg className="w-3.5 h-3.5 text-blue-300 fill-current -ml-2" viewBox="0 0 24 24">
-                                <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                              </svg>
-                            </div>
-                          )}
-                          {msg.status === 'failed' && (
-                            <span className="text-red-300">⚠️</span>
-                          )}
-                        </span>
-                      )}
+                            )}
+                            {msg.status === 'delivered' && (
+                              <div className="flex opacity-80">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                                <svg className="w-3.5 h-3.5 -ml-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </div>
+                            )}
+                            {msg.status === 'read' && (
+                              <div className="flex text-blue-300 drop-shadow-sm">
+                                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                </svg>
+                                <svg className="w-3.5 h-3.5 fill-current -ml-2.5" viewBox="0 0 24 24">
+                                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                </svg>
+                              </div>
+                            )}
+                            {msg.status === 'failed' && (
+                              <span className="text-red-300 font-extrabold" title="Message Failed">!</span>
+                            )}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <span className="text-[9px] text-text-secondary mt-1 font-semibold">
-                    {isOutbound ? 'via WhatsApp Business API' : 'Client Phone'}
-                  </span>
                 </div>
               );
             })}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Bottom Interactive Message Flow Strip */}
-          <div className="px-6 py-2 bg-bg-secondary/40 border-y border-border-color flex items-center justify-between text-[11px] text-text-secondary font-bold">
-            <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-              Message Pipeline Flow:
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="bg-bg-secondary px-2 py-0.5 rounded border border-border-color">1. Admin typing on portal</span>
-              <span>➔</span>
-              <span className="bg-green-500/10 text-green-600 px-2 py-0.5 rounded border border-green-500/20">2. Meta Cloud API (POST v18.0)</span>
-              <span>➔</span>
-              <span className="bg-bg-secondary px-2 py-0.5 rounded border border-border-color">3. WhatsApp Network Gateway</span>
-              <span>➔</span>
-              <span className="bg-bg-secondary px-2 py-0.5 rounded border border-border-color">4. Client WhatsApp Device</span>
-            </div>
+          {/* Premium Modern Message Input Bar */}
+          <div className="p-3 border-t border-border-color bg-bg-secondary relative z-10">
+            <form onSubmit={handleSendMessage} className="flex gap-2 sm:gap-3 items-end max-w-5xl mx-auto">
+              
+              {/* Attachment / Action Icons */}
+              <div className="flex gap-1 mb-1">
+                <button type="button" className="text-text-tertiary hover:text-green-500 hover:bg-bg-primary p-2.5 rounded-full transition-all">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </button>
+                <button type="button" className="text-text-tertiary hover:text-green-500 hover:bg-bg-primary p-2.5 rounded-full transition-all">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ transform: 'rotate(-45deg)' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Input Bubble */}
+              <div className="flex-1 bg-white dark:bg-[#1f2937] border border-border-color rounded-3xl flex items-center shadow-sm focus-within:ring-2 focus-within:ring-green-500/30 focus-within:border-green-500 transition-all overflow-hidden min-h-[48px]">
+                <input
+                  type="text"
+                  placeholder="Type a message..."
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  className="w-full bg-transparent border-none px-5 py-3 text-[15px] placeholder-text-tertiary focus:outline-none focus:ring-0 text-text-primary"
+                />
+              </div>
+
+              {/* Circular Send Button */}
+              <button
+                type="submit"
+                disabled={isSending || !inputText.trim()}
+                className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:scale-100 flex-shrink-0 mb-0.5"
+                title="Send via WhatsApp"
+              >
+                <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            </form>
           </div>
-
-          {/* Message Input Box */}
-          <form onSubmit={handleSendMessage} className="p-4 border-t border-border-color bg-bg-secondary flex gap-3 items-center">
-            <button type="button" className="text-text-secondary hover:text-green-500 transition-colors p-1.5">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-              </svg>
-            </button>
-            <button type="button" className="text-text-secondary hover:text-green-500 transition-colors p-1.5">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-
-            <input
-              type="text"
-              placeholder="Type message..."
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              className="flex-1 py-3 px-4 bg-bg-primary border border-border-color rounded-xl text-sm placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-green-500 text-text-primary"
-            />
-
-            <button
-              type="submit"
-              disabled={isSending || !inputText.trim()}
-              className="bg-green-600 hover:bg-green-700 text-white rounded-full w-12 h-12 flex items-center justify-center shadow-md transition-all duration-200 hover:shadow-lg disabled:opacity-50 flex-shrink-0"
-            >
-              <svg className="w-5 h-5 fill-current transform rotate-90" viewBox="0 0 24 24">
-                <path d="M2 21l21-9L2 3v7l15 2-15 2z"/>
-              </svg>
-            </button>
-          </form>
 
         </div>
       ) : (
