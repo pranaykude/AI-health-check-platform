@@ -7,7 +7,8 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "tunnel": "node src/scripts/tunnel.js",
-    "dev:full": "node src/scripts/tunnel.js"
+    "dev:full": "node src/scripts/tunnel.js",
+    "test-db": "node scratch/test_db.js"
   },
   "dependencies": {
     "@deepgram/sdk": "^5.0.0",
@@ -31,6 +32,7 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.7",
     "openai": "^6.34.0",
+    "resend": "^6.12.3",
     "socket.io": "^4.8.3",
     "twilio": "^6.0.0",
     "uuid": "^14.0.0",

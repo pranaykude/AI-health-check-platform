@@ -32,7 +32,7 @@ const seedMockupConversations = async () => {
           const m1 = await WhatsAppMessage.create({
             conversationId: conv._id,
             direction: 'inbound',
-            body: 'Hello, I wanted to check in about my health report.',
+            body: 'Hello, I wanted to check in about my ORAI Robotics AI Voice Agent.',
             status: 'read',
             waMessageId: 'wamid.HBgLOTE4MzE5OTYzNDQ3FQIAERgSRDMzRDBDMjkzMzk5MEFDMTBEAA==',
             createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000) // 2 hours ago
@@ -41,7 +41,7 @@ const seedMockupConversations = async () => {
           const m2 = await WhatsAppMessage.create({
             conversationId: conv._id,
             direction: 'outbound',
-            body: 'Hi Ayush! Your report looks good overall. Blood pressure slightly elevated.',
+            body: 'Hi Ayush! Your ORAI AI agent is performing flawlessly. Call success rate is at 98%.',
             status: 'read',
             waMessageId: 'wamid.HBgLOTE4MzE5OTYzNDQ3FQIAERgSRDMzRDBDMjkzMzk5MEFDMTBFAA==',
             createdAt: new Date(now.getTime() - 110 * 60 * 1000) // 1h 50m ago
@@ -50,7 +50,7 @@ const seedMockupConversations = async () => {
           const m3 = await WhatsAppMessage.create({
             conversationId: conv._id,
             direction: 'inbound',
-            body: 'Sure, my bp was 130/80 yesterday. Should I be worried?',
+            body: 'Sure, I noticed latency was 1.5s yesterday. Should I be worried?',
             status: 'read',
             waMessageId: 'wamid.HBgLOTE4MzE5OTYzNDQ3FQIAERgSRDMzRDBDMjkzMzk5MEFDMTBGAA==',
             createdAt: new Date(now.getTime() - 100 * 60 * 1000) // 1h 40m ago
@@ -73,7 +73,7 @@ const seedMockupConversations = async () => {
           const m1 = await WhatsAppMessage.create({
             conversationId: conv._id,
             direction: 'inbound',
-            body: 'When is my next success check call scheduled?',
+            body: 'When is my next ORAI Robotics success sync call scheduled?',
             status: 'read',
             waMessageId: 'wamid.mockup_kude_1',
             createdAt: new Date(now.getTime() - 4 * 60 * 60 * 1000)
@@ -86,7 +86,7 @@ const seedMockupConversations = async () => {
           const m1 = await WhatsAppMessage.create({
             conversationId: conv._id,
             direction: 'inbound',
-            body: 'Thank you doctor',
+            body: 'Thank you ORAI team for the update',
             status: 'read',
             waMessageId: 'wamid.mockup_prem_1',
             createdAt: new Date(now.getTime() - 12 * 60 * 60 * 1000)
@@ -257,11 +257,11 @@ exports.sendMessage = async (req, res) => {
       setTimeout(async () => {
         try {
           const replies = [
-            "Sure, thank you for checking in!",
-            "I checked my BP and it was normal this morning.",
-            "Can we reschedule our sync call for tomorrow?",
-            "Thanks for the update!",
-            "Sounds good, I will talk to the support team."
+            "Sure, thank you for checking in on our AI agent!",
+            "I checked the ORAI dashboard and the analytics look great this morning.",
+            "Can we reschedule our ORAI sync call for tomorrow?",
+            "Thanks for the update on the new voice models!",
+            "Sounds good, I will talk to the ORAI Robotics support team."
           ];
           const randomReply = replies[Math.floor(Math.random() * replies.length)];
           const replyId = `wamid.${Math.random().toString(36).substring(2, 15)}`;

@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ORAI Robotics — HealthCheck AI Voice Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root {
+  --black:#020408;--black-2:#060b12;--black-3:#0a1220;--black-4:#0e1828;--black-5:#131f32;
+  --blue:#2979ff;--blue-dim:#1a5fff;--blue-bright:#4d9aff;--blue-dark:#0a2a6e;
+  --blue-glow:rgba(41,121,255,0.15);--blue-border:rgba(41,121,255,0.25);
+  --cyan:#00d4ff;--cyan-dim:rgba(0,212,255,0.15);
+  --white:#f0f6ff;--white-2:#c8d8f0;--white-3:#7a98c0;--white-4:#3a5278;--white-5:#1e2e48;
+  --border:rgba(41,121,255,0.08);--border-2:rgba(41,121,255,0.18);--border-3:rgba(41,121,255,0.35);
+  --font-d:'Rajdhani',sans-serif;--font-b:'DM Sans',sans-serif;--font-m:'JetBrains Mono',monospace;
+  --ease:cubic-bezier(0.23,1,0.32,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--black);color:var(--white);font-family:var(--font-b);overflow-x:hidden;line-height:1.6;font-size:16px}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--black-2)}::-webkit-scrollbar-thumb{background:var(--blue-dark);border-radius:2px}
+::selection{background:rgba(41,121,255,0.3);color:var(--white)}
+
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(41,121,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(41,121,255,0.04) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none;animation:gridPulse 8s ease-in-out infinite}
+@keyframes gridPulse{0%,100%{opacity:0.6}50%{opacity:1}}
+
+body::after{content:'';position:fixed;top:-100%;left:0;right:0;height:200%;background:linear-gradient(transparent 50%,rgba(41,121,255,0.012) 50%);background-size:100% 4px;z-index:0;pointer-events:none;animation:scan 10s linear infinite}
+@keyframes scan{from{transform:translateY(0)}to{transform:translateY(50%)}}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:1000;height:68px;display:flex;align-items:center;justify-content:space-between;padding:0 5%;border-bottom:1px solid var(--border);backdrop-filter:blur(28px);background:rgba(2,4,8,0.8);transition:all 0.4s}
+nav.scrolled{background:rgba(2,4,8,0.97);box-shadow:0 0 40px rgba(41,121,255,0.08)}
+.nav-logo{display:flex;align-items:center;gap:14px;text-decoration:none;perspective:600px}
+.logo-icon{width:42px;height:42px;border:1px solid var(--blue-border);border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;transition:all 0.4s var(--ease);transform-style:preserve-3d}
+.logo-icon:hover{transform:rotateY(15deg) rotateX(-10deg);border-color:var(--blue);box-shadow:0 0 24px rgba(41,121,255,0.4)}
+.logo-icon::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--blue-glow),transparent)}
+.logo-icon svg{width:22px;height:22px;position:relative;z-index:1}
+.logo-name{font-family:var(--font-d);font-size:22px;font-weight:700;letter-spacing:0.12em;color:var(--white)}
+.logo-name span{color:var(--blue);text-shadow:0 0 20px rgba(41,121,255,0.5)}
+.logo-tag{font-family:var(--font-m);font-size:9px;color:var(--white-4);letter-spacing:0.25em;text-transform:uppercase;margin-top:2px}
+.nav-links{display:flex;gap:36px;align-items:center}
+.nav-links a{color:var(--white-3);text-decoration:none;font-size:12px;font-weight:400;letter-spacing:0.1em;text-transform:uppercase;font-family:var(--font-m);transition:all 0.3s;position:relative}
+.nav-links a::after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:1px;background:var(--blue);transform:scaleX(0);transition:transform 0.3s var(--ease);transform-origin:center}
+.nav-links a:hover{color:var(--blue-bright)}
+.nav-links a:hover::after{transform:scaleX(1)}
+.nav-cta{font-family:var(--font-m);font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--white);background:var(--blue);padding:10px 24px;border-radius:4px;text-decoration:none;transition:all 0.3s var(--ease);position:relative;overflow:hidden}
+.nav-cta::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);transform:translateX(-100%);transition:transform 0.5s}
+.nav-cta:hover::before{transform:translateX(100%)}
+.nav-cta:hover{background:var(--blue-bright);transform:translateY(-2px);box-shadow:0 8px 28px rgba(41,121,255,0.4)}
+
+/* HERO */
+#hero{min-height:100vh;display:flex;align-items:center;padding:0 5%;padding-top:68px;position:relative;overflow:hidden}
+#agent-canvas-wrap{position:absolute;inset:0;z-index:1}
+#agent-canvas{width:100%;height:100%;display:block}
+.hero-layout{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;width:100%;position:relative;z-index:10}
+
+.hero-badge{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--blue-border);border-radius:2px;padding:8px 18px;font-family:var(--font-m);font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--blue-bright);margin-bottom:32px;background:rgba(41,121,255,0.06);animation:badgePulse 3s ease-in-out infinite}
+@keyframes badgePulse{0%,100%{box-shadow:0 0 0 0 rgba(41,121,255,0.2)}50%{box-shadow:0 0 0 8px rgba(41,121,255,0)}}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);animation:pblue 2s ease-in-out infinite}
+@keyframes pblue{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(41,121,255,0.5)}50%{opacity:0.7;box-shadow:0 0 0 6px rgba(41,121,255,0)}}
+
+.hero-h1{font-family:var(--font-d);font-size:clamp(52px,5.5vw,84px);font-weight:700;line-height:1.0;letter-spacing:-0.01em;margin-bottom:28px}
+.hero-h1 .dim{color:var(--white-2);font-weight:300}
+.hero-h1 .blue{color:var(--blue);text-shadow:0 0 40px rgba(41,121,255,0.4)}
+.hero-sub{font-size:17px;color:var(--white-3);line-height:1.8;max-width:500px;margin-bottom:44px}
+
+.hero-actions{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:56px}
+
+.btn-primary{background:var(--blue);color:var(--white);padding:15px 36px;border-radius:4px;font-family:var(--font-m);font-size:13px;font-weight:700;letter-spacing:0.08em;text-decoration:none;text-transform:uppercase;transition:all 0.3s var(--ease);display:inline-flex;align-items:center;gap:10px;position:relative;overflow:hidden;transform-style:preserve-3d}
+.btn-primary::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);transform:translateX(-100%);transition:transform 0.5s}
+.btn-primary::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,rgba(255,255,255,0.1),transparent 70%);opacity:0;transition:opacity 0.3s}
+.btn-primary:hover::before{transform:translateX(100%)}
+.btn-primary:hover::after{opacity:1}
+.btn-primary:hover{background:var(--blue-bright);transform:translateY(-3px) perspective(500px) rotateX(5deg);box-shadow:0 16px 40px rgba(41,121,255,0.4),0 0 0 1px rgba(255,255,255,0.1)}
+.btn-primary:active{transform:translateY(0) scale(0.97)}
+
+.btn-outline{background:transparent;color:var(--white-2);padding:15px 36px;border-radius:4px;font-family:var(--font-m);font-size:13px;letter-spacing:0.08em;text-decoration:none;text-transform:uppercase;border:1px solid var(--border-2);transition:all 0.3s var(--ease);display:inline-flex;align-items:center;gap:10px;position:relative;overflow:hidden}
+.btn-outline::before{content:'';position:absolute;inset:0;background:var(--blue-glow);transform:scaleX(0);transform-origin:left;transition:transform 0.4s var(--ease)}
+.btn-outline:hover::before{transform:scaleX(1)}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue-bright);transform:translateY(-2px)}
+
+.hero-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.stat{padding:20px 24px;border-right:1px solid var(--border);transition:all 0.3s;cursor:default}
+.stat:last-child{border-right:none}
+.stat:hover{background:var(--blue-glow)}
+.stat-n{font-family:var(--font-d);font-size:32px;font-weight:700;color:var(--blue);letter-spacing:-0.02em;line-height:1;margin-bottom:6px;transition:all 0.3s}
+.stat:hover .stat-n{color:var(--blue-bright);text-shadow:0 0 20px rgba(41,121,255,0.5);transform:scale(1.05)}
+.stat-l{font-family:var(--font-m);font-size:10px;color:var(--white-4);letter-spacing:0.15em;text-transform:uppercase}
+
+/* Floating cards */
+.hero-visual{position:relative;width:100%;height:580px}
+.f-card{position:absolute;background:rgba(6,11,18,0.92);border:1px solid var(--blue-border);border-radius:4px;padding:14px 18px;backdrop-filter:blur(20px);z-index:20;transition:all 0.3s var(--ease)}
+.f-card:hover{border-color:var(--blue);box-shadow:0 0 30px rgba(41,121,255,0.2);transform:translateY(-4px) scale(1.02)}
+.f-card-label{font-family:var(--font-m);font-size:9px;color:var(--white-4);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:6px}
+.f-card-value{font-family:var(--font-d);font-size:20px;font-weight:700;color:var(--blue-bright)}
+.f-card-sub{font-size:11px;color:var(--white-3);margin-top:3px}
+.f-card-langs{display:flex;gap:6px;margin-top:8px}
+.lang{font-family:var(--font-m);font-size:10px;font-weight:700;padding:3px 10px;border-radius:2px}
+.lang-en{background:rgba(41,121,255,0.1);color:var(--blue-bright);border:1px solid var(--blue-border)}
+.lang-hi{background:rgba(0,212,255,0.1);color:var(--cyan);border:1px solid rgba(0,212,255,0.2)}
+.alert-pip{width:7px;height:7px;border-radius:50%;background:var(--blue);box-shadow:0 0 8px var(--blue);animation:pblue 2s infinite}
+.alert-pip.danger{background:#ff4466;box-shadow:0 0 8px #ff4466;animation:none}
+@keyframes float1{0%,100%{transform:translateY(0) rotateZ(0deg)}50%{transform:translateY(-14px) rotateZ(0.5deg)}}
+@keyframes float2{0%,100%{transform:translateY(0) rotateZ(0deg)}50%{transform:translateY(-9px) rotateZ(-0.5deg)}}
+
+/* TICKER */
+.ticker{overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--black-2);padding:12px 0;position:relative;z-index:10}
+.ticker-track{display:flex;animation:tick 35s linear infinite;white-space:nowrap}
+.ticker-item{display:flex;align-items:center;gap:16px;padding:0 48px;font-family:var(--font-m);font-size:11px;color:var(--white-4);letter-spacing:0.1em;text-transform:uppercase}
+.ticker-item .hi{color:var(--blue-bright)}
+.ticker-sep{color:var(--white-5)}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* SECTIONS */
+section{position:relative;z-index:10;padding:120px 5%}
+.container{max-width:1280px;margin:0 auto}
+.label{font-family:var(--font-m);font-size:11px;font-weight:500;letter-spacing:0.3em;text-transform:uppercase;color:var(--blue-bright);display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.label::before{content:'';width:32px;height:1px;background:var(--blue)}
+.label::after{content:attr(data-index);color:var(--white-4)}
+h2.section-title{font-family:var(--font-d);font-size:clamp(40px,4.5vw,68px);font-weight:700;line-height:1.05;letter-spacing:-0.01em;margin-bottom:24px;color:var(--white)}
+.g{color:var(--blue);text-shadow:0 0 30px rgba(41,121,255,0.3)}
+.section-body{font-size:17px;color:var(--white-3);max-width:580px;line-height:1.75}
+
+/* 3D CARD BASE */
+.card-3d{transform-style:preserve-3d;transition:transform 0.4s var(--ease),box-shadow 0.4s var(--ease)}
+.card-3d:hover{transform:perspective(800px) rotateX(-4deg) rotateY(3deg) translateY(-6px);box-shadow:20px 20px 60px rgba(0,0,0,0.5),-5px -5px 20px rgba(41,121,255,0.05)}
+
+/* OVERVIEW */
+#overview{background:var(--black-2)}
+.flow-wrap{display:grid;grid-template-columns:repeat(6,1fr);gap:0;margin-top:72px;border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.flow-step{padding:40px 24px;border-right:1px solid var(--border);position:relative;transition:all 0.4s var(--ease);cursor:default;perspective:600px}
+.flow-step:last-child{border-right:none}
+.flow-step:hover{background:var(--blue-glow);transform:perspective(600px) translateZ(8px)}
+.flow-step::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(41,121,255,0.08),transparent);opacity:0;transition:opacity 0.4s}
+.flow-step:hover::before{opacity:1}
+.flow-n{font-family:var(--font-m);font-size:10px;color:var(--blue);letter-spacing:0.2em;margin-bottom:20px;text-transform:uppercase}
+.flow-icon{font-size:28px;margin-bottom:16px;display:block;transition:transform 0.4s var(--ease)}
+.flow-step:hover .flow-icon{transform:scale(1.2) translateZ(10px)}
+.flow-title{font-family:var(--font-d);font-size:15px;font-weight:600;color:var(--white);margin-bottom:8px;letter-spacing:0.02em}
+.flow-desc{font-size:12px;color:var(--white-4);line-height:1.6}
+
+/* FEATURES */
+#features{background:var(--black)}
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-top:72px}
+.feat-card{background:var(--black);padding:44px 36px;position:relative;transition:all 0.4s var(--ease);cursor:default;transform-style:preserve-3d}
+.feat-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(41,121,255,0.06),transparent 60%);opacity:0;transition:opacity 0.4s}
+.feat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--blue),var(--cyan),transparent);opacity:0;transition:opacity 0.4s}
+.feat-card:hover{background:var(--black-3);transform:perspective(800px) translateZ(10px) rotateX(-2deg)}
+.feat-card:hover::before,.feat-card:hover::after{opacity:1}
+.feat-icon{width:52px;height:52px;border:1px solid var(--border-2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:28px;background:rgba(41,121,255,0.05);transition:all 0.4s var(--ease)}
+.feat-card:hover .feat-icon{border-color:var(--blue);background:rgba(41,121,255,0.12);transform:perspective(400px) rotateY(15deg) scale(1.1);box-shadow:0 8px 24px rgba(41,121,255,0.2)}
+.feat-title{font-family:var(--font-d);font-size:20px;font-weight:600;letter-spacing:0.02em;margin-bottom:14px;color:var(--white)}
+.feat-desc{font-size:14px;color:var(--white-3);line-height:1.75;margin-bottom:24px}
+.feat-tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-family:var(--font-m);font-size:10px;font-weight:500;padding:4px 10px;border-radius:2px;letter-spacing:0.1em;background:rgba(41,121,255,0.06);color:#82b1ff;border:1px solid rgba(41,121,255,0.15);text-transform:uppercase;transition:all 0.2s}
+.tag:hover{background:rgba(41,121,255,0.15);color:var(--blue-bright);transform:translateY(-1px)}
+
+/* USE CASES */
+#usecases{background:var(--black-2)}
+.use-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;margin-top:72px}
+.use-card{background:var(--black-3);border:1px solid var(--border);border-radius:4px;padding:44px;transition:all 0.4s var(--ease);position:relative;overflow:hidden;transform-style:preserve-3d}
+.use-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--blue),var(--cyan),transparent);opacity:0;transition:opacity 0.4s}
+.use-card::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(41,121,255,0.08),transparent 60%);opacity:0;transition:opacity 0.4s;pointer-events:none}
+.use-card:hover::before,.use-card:hover::after{opacity:1}
+.use-card:hover{border-color:var(--border-2);transform:perspective(800px) translateY(-6px) rotateX(-2deg);box-shadow:0 20px 60px rgba(0,0,0,0.4),0 0 0 1px rgba(41,121,255,0.1)}
+.use-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:2px;margin-bottom:22px;font-family:var(--font-m);font-size:11px;font-weight:500;letter-spacing:0.15em;text-transform:uppercase}
+.chip-b{background:rgba(41,121,255,0.08);border:1px solid rgba(41,121,255,0.2);color:var(--blue-bright)}
+.chip-c{background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);color:var(--cyan)}
+.chip-w{background:rgba(255,170,0,0.08);border:1px solid rgba(255,170,0,0.2);color:#ffaa00}
+.chip-r{background:rgba(255,68,102,0.08);border:1px solid rgba(255,68,102,0.2);color:#ff4466}
+.use-title{font-family:var(--font-d);font-size:26px;font-weight:600;letter-spacing:0.01em;margin-bottom:14px;color:var(--white)}
+.use-desc{font-size:14px;color:var(--white-3);line-height:1.8;margin-bottom:28px}
+.use-points{list-style:none}
+.use-points li{display:flex;align-items:flex-start;gap:12px;font-size:13px;color:var(--white-3);padding:7px 0;border-bottom:1px solid rgba(41,121,255,0.06);transition:color 0.2s}
+.use-points li:last-child{border-bottom:none}
+.use-points li:hover{color:var(--white-2)}
+.use-points li::before{content:'→';color:var(--blue);font-family:var(--font-m);font-weight:700;flex-shrink:0;margin-top:1px;transition:transform 0.2s}
+.use-points li:hover::before{transform:translateX(4px)}
+
+/* AI PIPELINE */
+#howai{background:var(--black)}
+.pipeline{display:flex;align-items:stretch;margin-top:72px;border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.pipe-step{flex:1;padding:36px 20px;text-align:center;border-right:1px solid var(--border);position:relative;transition:all 0.4s var(--ease);cursor:default}
+.pipe-step:last-child{border-right:none}
+.pipe-step:hover{background:var(--blue-glow)}
+.pipe-step::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(41,121,255,0.05),transparent);opacity:0;transition:opacity 0.4s}
+.pipe-step:hover::before{opacity:1}
+.pipe-num{font-family:var(--font-m);font-size:9px;color:var(--blue);letter-spacing:0.25em;text-transform:uppercase;margin-bottom:16px}
+.pipe-icon{width:52px;height:52px;border-radius:50%;border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 auto 16px;background:rgba(41,121,255,0.04);transition:all 0.4s var(--ease)}
+.pipe-step:hover .pipe-icon{border-color:var(--blue);box-shadow:0 0 24px rgba(41,121,255,0.3);transform:scale(1.15) rotateZ(5deg)}
+.pipe-label{font-family:var(--font-d);font-size:14px;font-weight:600;letter-spacing:0.02em;color:var(--white);margin-bottom:6px}
+.pipe-sub{font-size:11px;color:var(--white-4);line-height:1.5}
+
+/* WORKSPACE */
+#workspace{background:var(--black-2)}
+.workspace-grid{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;margin-top:72px}
+.ws-features{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:40px}
+.ws-card{background:var(--black-3);border:1px solid var(--border);border-radius:4px;padding:24px;transition:all 0.4s var(--ease);cursor:default;transform-style:preserve-3d}
+.ws-card:hover{border-color:var(--border-2);transform:perspective(600px) rotateX(-3deg) rotateY(3deg) translateZ(8px);background:var(--black-4);box-shadow:8px 8px 24px rgba(0,0,0,0.4)}
+.ws-icon{font-size:24px;margin-bottom:12px;display:block;transition:transform 0.4s var(--ease)}
+.ws-card:hover .ws-icon{transform:scale(1.2) translateZ(4px)}
+.ws-title{font-family:var(--font-d);font-size:15px;font-weight:600;color:var(--white);margin-bottom:6px;letter-spacing:0.02em}
+.ws-desc{font-size:12px;color:var(--white-4);line-height:1.6}
+
+.mock-ui{background:var(--black);border:1px solid var(--border-2);border-radius:4px;overflow:hidden;transform-style:preserve-3d;transition:transform 0.5s var(--ease),box-shadow 0.5s var(--ease)}
+.mock-ui:hover{transform:perspective(1000px) rotateY(-4deg) rotateX(2deg);box-shadow:20px 10px 60px rgba(0,0,0,0.5),0 0 40px rgba(41,121,255,0.08)}
+.mock-bar{display:flex;align-items:center;gap:8px;padding:12px 18px;border-bottom:1px solid var(--border);background:var(--black-2)}
+.mock-dot{width:10px;height:10px;border-radius:50%}
+.mock-title{font-family:var(--font-m);font-size:10px;color:var(--white-4);margin-left:auto;letter-spacing:0.1em}
+.mock-body{padding:18px}
+.mock-sub{font-family:var(--font-m);font-size:9px;color:var(--white-5);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:12px}
+.client-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:2px;margin-bottom:4px;border:1px solid transparent;transition:all 0.3s var(--ease);cursor:default}
+.client-row:hover{background:rgba(41,121,255,0.06);border-color:var(--border);transform:translateX(4px)}
+.client-row.active{background:rgba(41,121,255,0.08);border-color:var(--border-2)}
+.c-avatar{width:32px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--font-m);font-size:11px;font-weight:700;flex-shrink:0}
+.c-name{font-size:13px;font-weight:500;flex:1}
+.c-badge{font-family:var(--font-m);font-size:10px;padding:3px 8px;border-radius:2px;font-weight:700}
+.s-ok{background:rgba(41,121,255,0.1);color:var(--blue-bright);border:1px solid rgba(41,121,255,0.2)}
+.s-warn{background:rgba(255,170,0,0.1);color:#ffaa00;border:1px solid rgba(255,170,0,0.2)}
+.s-bad{background:rgba(255,68,102,0.1);color:#ff4466;border:1px solid rgba(255,68,102,0.2)}
+.mock-divider{height:1px;background:var(--border);margin:14px 0}
+.ai-insight{background:rgba(41,121,255,0.04);border:1px solid var(--border-2);border-radius:2px;padding:14px}
+.ai-insight-label{font-family:var(--font-m);font-size:9px;color:var(--blue-bright);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.ai-insight-label::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--blue);animation:pblue 2s infinite}
+.ai-insight p{font-size:12px;color:var(--white-3);line-height:1.7}
+
+/* ANALYTICS */
+#analytics{background:var(--black)}
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:72px;margin-bottom:32px}
+.metric-card{background:var(--black-3);border:1px solid var(--border);border-radius:4px;padding:28px;transition:all 0.4s var(--ease);cursor:default;transform-style:preserve-3d}
+.metric-card:hover{border-color:var(--border-2);transform:perspective(600px) translateZ(12px) rotateX(-3deg);box-shadow:0 20px 40px rgba(0,0,0,0.4),0 0 30px rgba(41,121,255,0.1)}
+.m-label{font-family:var(--font-m);font-size:10px;color:var(--white-4);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:14px}
+.m-value{font-family:var(--font-d);font-size:42px;font-weight:700;color:var(--blue);line-height:1;margin-bottom:8px;letter-spacing:-0.02em;transition:all 0.3s}
+.metric-card:hover .m-value{color:var(--blue-bright);text-shadow:0 0 20px rgba(41,121,255,0.4)}
+.m-change{font-family:var(--font-m);font-size:11px;display:flex;align-items:center;gap:4px}
+.up{color:var(--blue-bright)}.down{color:#ff4466}
+.chart-wrap{background:var(--black-3);border:1px solid var(--border);border-radius:4px;padding:36px}
+.chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:32px}
+.chart-title{font-family:var(--font-d);font-size:18px;font-weight:600;letter-spacing:0.02em}
+.chart-legend{display:flex;gap:20px}
+.legend-item{display:flex;align-items:center;gap:8px;font-family:var(--font-m);font-size:11px;color:var(--white-3)}
+.legend-dot{width:8px;height:2px;border-radius:1px}
+.bars-container{display:flex;align-items:flex-end;gap:12px;height:160px}
+.bar-month{display:flex;flex-direction:column;align-items:center;flex:1}
+.bar-group{display:flex;gap:3px;align-items:flex-end;width:100%;justify-content:center}
+.bar{border-radius:2px 2px 0 0;transition:all 0.3s var(--ease);cursor:default}
+.bar:hover{filter:brightness(1.3);transform:scaleY(1.05) translateY(-2px)}
+.bar-a{background:var(--blue);width:14px}
+.bar-b{background:rgba(0,212,255,0.5);width:14px}
+.bar-lbl{font-family:var(--font-m);font-size:9px;color:var(--white-5);margin-top:8px;letter-spacing:0.1em}
+
+/* SECURITY */
+#security{background:var(--black-2)}
+.sec-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:72px}
+.sec-card{background:var(--black-3);border:1px solid var(--border);border-radius:4px;padding:36px 28px;text-align:center;transition:all 0.4s var(--ease);cursor:default;transform-style:preserve-3d;position:relative;overflow:hidden}
+.sec-card::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 0%,rgba(41,121,255,0.1),transparent 60%);opacity:0;transition:opacity 0.4s}
+.sec-card:hover::before{opacity:1}
+.sec-card:hover{border-color:var(--border-3);transform:perspective(600px) translateZ(14px) rotateX(-4deg);background:var(--black-4);box-shadow:0 24px 60px rgba(0,0,0,0.5),0 0 30px rgba(41,121,255,0.1)}
+.sec-icon{font-size:32px;margin-bottom:20px;display:block;transition:transform 0.4s var(--ease)}
+.sec-card:hover .sec-icon{transform:scale(1.25) translateZ(8px) rotateZ(5deg)}
+.sec-title{font-family:var(--font-d);font-size:17px;font-weight:600;color:var(--white);margin-bottom:12px;letter-spacing:0.02em}
+.sec-desc{font-size:13px;color:var(--white-4);line-height:1.7}
+
+/* CTA */
+#cta{background:var(--black);padding:140px 5%}
+.cta-wrap{max-width:840px;margin:0 auto;text-align:center;position:relative}
+.cta-glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:700px;height:300px;background:radial-gradient(ellipse,rgba(41,121,255,0.1) 0%,transparent 70%);pointer-events:none;z-index:0;animation:ctaGlow 4s ease-in-out infinite}
+@keyframes ctaGlow{0%,100%{opacity:0.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}}
+.cta-h2{font-family:var(--font-d);font-size:clamp(40px,5vw,72px);font-weight:700;letter-spacing:-0.01em;line-height:1.05;margin-bottom:24px;position:relative;z-index:1}
+.cta-sub{font-size:17px;color:var(--white-3);line-height:1.75;margin-bottom:48px;position:relative;z-index:1}
+.cta-btns{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}
+.cta-trust{display:flex;justify-content:center;gap:40px;flex-wrap:wrap;margin-top:48px;position:relative;z-index:1}
+.trust-item{font-family:var(--font-m);font-size:11px;color:var(--white-4);letter-spacing:0.1em;text-transform:uppercase;display:flex;align-items:center;gap:8px;transition:color 0.2s}
+.trust-item:hover{color:var(--blue-bright)}
+.trust-item::before{content:'✓';color:var(--blue);font-weight:700}
+
+/* FOOTER */
+footer{background:var(--black-2);border-top:1px solid var(--border);padding:72px 5% 40px}
+.footer-grid{max-width:1280px;margin:0 auto}
+.footer-top{display:grid;grid-template-columns:2.5fr 1fr 1fr 1fr;gap:60px;margin-bottom:60px}
+.footer-brand p{font-size:14px;color:var(--white-4);line-height:1.75;max-width:280px;margin-top:16px}
+.footer-col h4{font-family:var(--font-m);font-size:10px;font-weight:500;letter-spacing:0.2em;text-transform:uppercase;color:var(--white-4);margin-bottom:20px}
+.footer-col a{display:block;font-size:14px;color:var(--white-3);text-decoration:none;margin-bottom:10px;transition:all 0.2s;position:relative;padding-left:0}
+.footer-col a::before{content:'';position:absolute;left:0;bottom:-1px;width:0;height:1px;background:var(--blue);transition:width 0.3s var(--ease)}
+.footer-col a:hover{color:var(--blue-bright);padding-left:8px}
+.footer-col a:hover::before{width:100%}
+.footer-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:28px;border-top:1px solid var(--border)}
+.footer-copy{font-size:12px;color:var(--white-5);font-family:var(--font-m)}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:12px;color:var(--white-5);text-decoration:none;transition:color 0.2s}
+.footer-links a:hover{color:var(--white-3)}
+
+/* REVEAL */
+.reveal{opacity:0;transform:translateY(28px) translateZ(-20px);transition:opacity 0.8s var(--ease),transform 0.8s var(--ease)}
+.reveal.in{opacity:1;transform:translateY(0) translateZ(0)}
+.d1{transition-delay:0.1s}.d2{transition-delay:0.2s}.d3{transition-delay:0.3s}.d4{transition-delay:0.4s}
+
+/* PARTICLE CURSOR */
+#cursor-trail{position:fixed;inset:0;pointer-events:none;z-index:9999}
+
+/* RESPONSIVE */
+@media(max-width:1024px){.hero-layout{grid-template-columns:1fr}.hero-visual{height:400px}.flow-wrap{grid-template-columns:repeat(3,1fr)}.features-grid{grid-template-columns:1fr 1fr}.metrics-grid{grid-template-columns:1fr 1fr}.sec-grid{grid-template-columns:1fr 1fr}.workspace-grid{grid-template-columns:1fr}.footer-top{grid-template-columns:1fr 1fr}.pipeline{flex-direction:column}.pipe-step{border-right:none;border-bottom:1px solid var(--border);width:100%}}
+@media(max-width:640px){.hero-stats{grid-template-columns:1fr 1fr}.features-grid{grid-template-columns:1fr}.use-grid{grid-template-columns:1fr}.sec-grid{grid-template-columns:1fr}.metrics-grid{grid-template-columns:1fr}.footer-top{grid-template-columns:1fr}.nav-links{display:none}section{padding:80px 5%}}
+</style>
+</head>
+<body>
+<canvas id="cursor-trail"></canvas>
+
+<!-- NAV -->
+<nav id="nav">
+  <a href="#" class="nav-logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="11" cy="11" r="9" stroke="#2979ff" stroke-width="1.2"/>
+        <circle cx="11" cy="11" r="3.5" fill="#2979ff" opacity="0.8"/>
+        <line x1="11" y1="2" x2="11" y2="5" stroke="#2979ff" stroke-width="1.2" stroke-linecap="round"/>
+        <line x1="11" y1="17" x2="11" y2="20" stroke="#2979ff" stroke-width="1.2" stroke-linecap="round"/>
+        <line x1="20" y1="11" x2="17" y2="11" stroke="#00d4ff" stroke-width="1.2" stroke-linecap="round"/>
+        <line x1="2" y1="11" x2="5" y2="11" stroke="#00d4ff" stroke-width="1.2" stroke-linecap="round"/>
+        <circle cx="17" cy="5" r="1.8" fill="#2979ff" opacity="0.5"/>
+        <circle cx="5" cy="17" r="1.8" fill="#2979ff" opacity="0.5"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-name"><span>ORAI</span> ROBOTICS</div>
+      <div class="logo-tag">AI Voice Operations</div>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="#overview">Platform</a>
+    <a href="#features">Features</a>
+    <a href="#usecases">Use Cases</a>
+    <a href="#analytics">Analytics</a>
+    <a href="#security">Security</a>
+  </div>
+  <a href="#cta" class="nav-cta">Request Demo</a>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <canvas id="agent-canvas" style="position:absolute;inset:0;width:100%;height:100%;z-index:1"></canvas>
+  <div class="hero-layout">
+    <div class="hero-content">
+      <div class="hero-badge reveal"><div class="badge-dot"></div>AI Voice Operations Platform · Live</div>
+      <h1 class="hero-h1 reveal d1">Automate<br><span class="blue">Client Health</span><br><span class="dim">with Real-Time AI</span></h1>
+      <p class="hero-sub reveal d2">ORAI's AI Voice Agent calls your clients automatically, understands conversations, detects issues in real time, and delivers structured business intelligence — so your team focuses on what matters.</p>
+      <div class="hero-actions reveal d3">
+        <a href="#cta" class="btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M5 3l14 9-14 9V3z"/></svg>
+          Request Demo
+        </a>
+        <a href="/" class="btn-outline">Explore Platform →</a>
+      </div>
+      <div class="hero-stats reveal d4">
+        <div class="stat"><div class="stat-n">98%</div><div class="stat-l">Call Accuracy</div></div>
+        <div class="stat"><div class="stat-n">2×</div><div class="stat-l">EN + HI Support</div></div>
+        <div class="stat"><div class="stat-n">&lt;2s</div><div class="stat-l">Response Time</div></div>
+        <div class="stat"><div class="stat-n">100%</div><div class="stat-l">Automated</div></div>
+      </div>
+    </div>
+    <div class="hero-visual reveal d2">
+      <div class="f-card" style="top:6%;right:0;animation:float1 6s ease-in-out infinite">
+        <div class="f-card-label">Calls This Month</div>
+        <div class="f-card-value">1,284</div>
+        <div class="f-card-sub" style="color:var(--blue-bright);display:flex;align-items:center;gap:4px;margin-top:4px"><span>↑</span> +18.2% vs last month</div>
+      </div>
+      <div class="f-card" style="bottom:10%;left:0;animation:float2 7s ease-in-out infinite">
+        <div class="f-card-label">Voice Languages</div>
+        <div class="f-card-langs"><span class="lang lang-en">EN</span><span class="lang lang-hi">हिं</span></div>
+        <div class="f-card-sub" style="margin-top:8px">Bilingual AI conversations</div>
+      </div>
+      <div class="f-card" style="bottom:34%;right:0;animation:float1 8s ease-in-out infinite 1s">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="alert-pip danger"></div>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--white)">Issue Detected</div>
+            <div style="font-size:11px;color:var(--white-4);margin-top:2px">TechCorp — auto-escalated</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-track" id="ticker">
+    <div class="ticker-item"><span class="hi">AI Voice Conversations</span><span class="ticker-sep">·</span>Real-Time Sentiment Analysis</div>
+    <div class="ticker-item"><span class="hi">Automated Health Checks</span><span class="ticker-sep">·</span>English &amp; Hindi Support</div>
+    <div class="ticker-item"><span class="hi">Smart Issue Detection</span><span class="ticker-sep">·</span>Automated Follow-Up Emails</div>
+    <div class="ticker-item"><span class="hi">Call Recordings &amp; Transcripts</span><span class="ticker-sep">·</span>Team Collaboration Workspace</div>
+    <div class="ticker-item"><span class="hi">Customer Success Analytics</span><span class="ticker-sep">·</span>Enterprise-Grade Security</div>
+    <div class="ticker-item"><span class="hi">AI Voice Conversations</span><span class="ticker-sep">·</span>Real-Time Sentiment Analysis</div>
+    <div class="ticker-item"><span class="hi">Automated Health Checks</span><span class="ticker-sep">·</span>English &amp; Hindi Support</div>
+    <div class="ticker-item"><span class="hi">Smart Issue Detection</span><span class="ticker-sep">·</span>Automated Follow-Up Emails</div>
+    <div class="ticker-item"><span class="hi">Call Recordings &amp; Transcripts</span><span class="ticker-sep">·</span>Team Collaboration Workspace</div>
+    <div class="ticker-item"><span class="hi">Customer Success Analytics</span><span class="ticker-sep">·</span>Enterprise-Grade Security</div>
+  </div>
+</div>
+
+<!-- OVERVIEW -->
+<section id="overview">
+  <div class="container">
+    <div class="label reveal" data-index="01">Platform Flow</div>
+    <h2 class="section-title reveal d1">End-to-End Customer<br><span class="g">Operations System</span></h2>
+    <p class="section-body reveal d2">A complete operational pipeline — from client management to automated follow-ups — powered by AI at every step.</p>
+    <div class="flow-wrap reveal d2">
+      <div class="flow-step"><div class="flow-n">Step 01</div><div class="flow-icon">👥</div><div class="flow-title">Client Managed</div><div class="flow-desc">Centralized client database with full history</div></div>
+      <div class="flow-step"><div class="flow-n">Step 02</div><div class="flow-icon">📅</div><div class="flow-title">AI Schedules</div><div class="flow-desc">Intelligent call scheduling &amp; outreach</div></div>
+      <div class="flow-step"><div class="flow-n">Step 03</div><div class="flow-icon">🎙️</div><div class="flow-title">AI Converses</div><div class="flow-desc">Human-like voice in English &amp; Hindi</div></div>
+      <div class="flow-step"><div class="flow-n">Step 04</div><div class="flow-icon">🧠</div><div class="flow-title">Auto Analyzed</div><div class="flow-desc">Conversation intelligence &amp; sentiment</div></div>
+      <div class="flow-step"><div class="flow-n">Step 05</div><div class="flow-icon">🚨</div><div class="flow-title">Issues Detected</div><div class="flow-desc">Automatic risk identification</div></div>
+      <div class="flow-step"><div class="flow-n">Step 06</div><div class="flow-icon">⚡</div><div class="flow-title">Teams Notified</div><div class="flow-desc">Instant alerts &amp; follow-up automation</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end">
+      <div>
+        <div class="label reveal" data-index="02">Core Capabilities</div>
+        <h2 class="section-title reveal d1">Everything Your Team<br><span class="g">Needs to Succeed</span></h2>
+      </div>
+      <p class="section-body reveal d2" style="max-width:300px;font-size:15px">Six powerful modules working together as one unified AI platform.</p>
+    </div>
+    <div class="features-grid">
+      <div class="feat-card reveal"><div class="feat-icon">🎙️</div><h3 class="feat-title">AI Voice Conversations</h3><p class="feat-desc">Human-like AI voice interactions with contextual memory and natural dialogue flow. Clients experience seamless, intelligent conversations — not robotic scripts.</p><div class="feat-tags"><span class="tag">English</span><span class="tag">Hindi</span><span class="tag">Contextual</span></div></div>
+      <div class="feat-card reveal d1"><div class="feat-icon">📋</div><h3 class="feat-title">Automated Health Checks</h3><p class="feat-desc">Schedule monthly, quarterly, or event-triggered outreach automatically. Proactive client engagement and service quality tracking without manual effort.</p><div class="feat-tags"><span class="tag">Scheduled</span><span class="tag">Proactive</span><span class="tag">Recurring</span></div></div>
+      <div class="feat-card reveal d2"><div class="feat-icon">🧠</div><h3 class="feat-title">AI Summaries &amp; Sentiment</h3><p class="feat-desc">Every conversation is analyzed automatically. Sentiment trends, issue flags, and actionable insights generated instantly — no manual review required.</p><div class="feat-tags"><span class="tag">Sentiment</span><span class="tag">NLP</span><span class="tag">Insights</span></div></div>
+      <div class="feat-card reveal"><div class="feat-icon">📼</div><h3 class="feat-title">Recordings &amp; Transcripts</h3><p class="feat-desc">Searchable transcripts and secure recording storage with full audit trail. Review any conversation, analyze historical data, and ensure compliance with ease.</p><div class="feat-tags"><span class="tag">Searchable</span><span class="tag">Secure</span><span class="tag">Audit</span></div></div>
+      <div class="feat-card reveal d1"><div class="feat-icon">👥</div><h3 class="feat-title">Customer Success Workspace</h3><p class="feat-desc">A collaborative environment for your support team — client assignments, internal notes, escalation management, and AI-powered alerts all in one place.</p><div class="feat-tags"><span class="tag">Collaborate</span><span class="tag">Assign</span><span class="tag">Escalate</span></div></div>
+      <div class="feat-card reveal d2"><div class="feat-icon">✉️</div><h3 class="feat-title">AI Follow-Up Automation</h3><p class="feat-desc">Context-aware follow-up emails sent automatically after every call. Issue-specific communication, escalation notifications, and intelligent client outreach — effortlessly.</p><div class="feat-tags"><span class="tag">Contextual</span><span class="tag">Auto-Send</span><span class="tag">Smart</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- USE CASES -->
+<section id="usecases">
+  <div class="container">
+    <div class="label reveal" data-index="03">Real Business Scenarios</div>
+    <h2 class="section-title reveal d1">Built for Modern<br><span class="g">Service Businesses</span></h2>
+    <p class="section-body reveal d2">From SaaS companies to managed service providers — ORAI is the operations backbone for client-facing teams.</p>
+    <div class="use-grid">
+      <div class="use-card reveal"><div class="use-chip chip-b">🏢 SaaS Companies</div><h3 class="use-title">Monitor Post-Deployment Satisfaction</h3><p class="use-desc">Schedule automated health check calls after every major deployment or feature release. Understand adoption challenges before they become churn events.</p><ul class="use-points"><li>Detect onboarding friction early</li><li>Track NPS through voice conversations</li><li>Escalate power users to success managers</li></ul></div>
+      <div class="use-card reveal d1"><div class="use-chip chip-c">⚙️ API Providers</div><h3 class="use-title">Catch Integration Issues Before They Escalate</h3><p class="use-desc">Proactively reach out to developers and integration teams. Identify performance complaints and API confusion before tickets flood your support queue.</p><ul class="use-points"><li>Proactive developer sentiment tracking</li><li>Performance complaint early warning</li><li>Auto-route technical issues to engineering</li></ul></div>
+      <div class="use-card reveal"><div class="use-chip chip-w">🤖 Automation Agencies</div><h3 class="use-title">Automate Client Engagement at Scale</h3><p class="use-desc">Run regular check-ins across dozens of client accounts without growing your team. AI handles the conversations — your team reviews what matters.</p><ul class="use-points"><li>Multi-client outreach without headcount</li><li>Automated project health reporting</li><li>AI flags accounts needing human attention</li></ul></div>
+      <div class="use-card reveal d1"><div class="use-chip chip-r">🛠️ MSPs</div><h3 class="use-title">Track Operational Health Across Accounts</h3><p class="use-desc">Maintain visibility across your entire client portfolio. Receive consolidated insights, spot at-risk accounts, and ensure SLA standards are consistently met.</p><ul class="use-points"><li>Portfolio-wide health dashboards</li><li>SLA compliance voice verification</li><li>Automated escalation to account leads</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- AI PIPELINE -->
+<section id="howai">
+  <div class="container">
+    <div class="label reveal" data-index="04">AI Pipeline</div>
+    <h2 class="section-title reveal d1">How the AI Understands<br><span class="g">Every Conversation</span></h2>
+    <p class="section-body reveal d2">A sophisticated pipeline converts spoken words into structured business intelligence — automatically, on every single call.</p>
+    <div class="pipeline reveal d2">
+      <div class="pipe-step"><div class="pipe-num">Stage 01</div><div class="pipe-icon">🎤</div><div class="pipe-label">Client Speaks</div><div class="pipe-sub">Real-time voice capture in EN or Hindi</div></div>
+      <div class="pipe-step"><div class="pipe-num">Stage 02</div><div class="pipe-icon">👂</div><div class="pipe-label">AI Understands</div><div class="pipe-sub">Speech recognition &amp; NLU processing</div></div>
+      <div class="pipe-step"><div class="pipe-num">Stage 03</div><div class="pipe-icon">💬</div><div class="pipe-label">AI Responds</div><div class="pipe-sub">Natural, context-aware voice reply</div></div>
+      <div class="pipe-step"><div class="pipe-num">Stage 04</div><div class="pipe-icon">🔍</div><div class="pipe-label">Issues Detected</div><div class="pipe-sub">Automatic risk &amp; problem identification</div></div>
+      <div class="pipe-step"><div class="pipe-num">Stage 05</div><div class="pipe-icon">📊</div><div class="pipe-label">Insights Generated</div><div class="pipe-sub">Summaries, sentiment scores, key themes</div></div>
+      <div class="pipe-step"><div class="pipe-num">Stage 06</div><div class="pipe-icon">🚀</div><div class="pipe-label">Teams Notified</div><div class="pipe-sub">Alerts, emails &amp; workspace tasks created</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:28px" class="reveal d3">
+      <div class="metric-card" style="text-align:center"><div class="m-label">Technology</div><div style="font-family:var(--font-d);font-size:16px;font-weight:600;color:var(--blue-bright)">AI Voice Engine</div><div style="font-size:12px;color:var(--white-4);margin-top:4px">Speech synthesis &amp; recognition</div></div>
+      <div class="metric-card" style="text-align:center"><div class="m-label">Technology</div><div style="font-family:var(--font-d);font-size:16px;font-weight:600;color:var(--cyan)">Conversation Intelligence</div><div style="font-size:12px;color:var(--white-4);margin-top:4px">NLU + context memory</div></div>
+      <div class="metric-card" style="text-align:center"><div class="m-label">Technology</div><div style="font-family:var(--font-d);font-size:16px;font-weight:600;color:var(--white-2)">Sentiment Analysis</div><div style="font-size:12px;color:var(--white-4);margin-top:4px">Real-time emotion detection</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- WORKSPACE -->
+<section id="workspace">
+  <div class="container">
+    <div class="workspace-grid">
+      <div>
+        <div class="label reveal" data-index="05">Team Collaboration</div>
+        <h2 class="section-title reveal d1">AI-Assisted Customer<br><span class="g">Success Operations</span></h2>
+        <p class="section-body reveal d2">Your support team gets a powerful workspace where AI does the heavy lifting — surfacing what needs attention, who needs follow-up, and what's at risk.</p>
+        <div class="ws-features reveal d3">
+          <div class="ws-card"><div class="ws-icon">📋</div><div class="ws-title">Client Assignment</div><div class="ws-desc">Route accounts to the right team members based on workload and expertise</div></div>
+          <div class="ws-card"><div class="ws-icon">💬</div><div class="ws-title">Internal Notes</div><div class="ws-desc">Shared context and conversation history across your entire team</div></div>
+          <div class="ws-card"><div class="ws-icon">🚨</div><div class="ws-title">AI Alerts</div><div class="ws-desc">Instant notifications when risk is detected or escalation is needed</div></div>
+          <div class="ws-card"><div class="ws-icon">📈</div><div class="ws-title">Escalation Flow</div><div class="ws-desc">Structured escalation paths with audit trail and resolution tracking</div></div>
+        </div>
+      </div>
+      <div class="mock-ui reveal d2">
+        <div class="mock-bar"><div class="mock-dot" style="background:#ff5f57"></div><div class="mock-dot" style="background:#febc2e"></div><div class="mock-dot" style="background:#28c840"></div><div class="mock-title">ORAI · Customer Workspace</div></div>
+        <div class="mock-body">
+          <div class="mock-sub">Active Accounts</div>
+          <div class="client-row active"><div class="c-avatar" style="background:rgba(41,121,255,0.1);color:var(--blue-bright)">TC</div><div class="c-name">TechCorp Solutions</div><div class="c-badge s-warn">⚠ At Risk</div></div>
+          <div class="client-row"><div class="c-avatar" style="background:rgba(41,121,255,0.08);color:var(--blue-bright)">NX</div><div class="c-name">Nexus AI Platform</div><div class="c-badge s-ok">✓ Healthy</div></div>
+          <div class="client-row"><div class="c-avatar" style="background:rgba(0,212,255,0.08);color:var(--cyan)">DS</div><div class="c-name">DataSync Enterprise</div><div class="c-badge s-ok">✓ Healthy</div></div>
+          <div class="client-row"><div class="c-avatar" style="background:rgba(255,68,102,0.08);color:#ff4466">SV</div><div class="c-name">SkyVault MSP</div><div class="c-badge s-bad">✕ Critical</div></div>
+          <div class="client-row"><div class="c-avatar" style="background:rgba(41,121,255,0.06);color:#82b1ff">FL</div><div class="c-name">FlowLogic Corp</div><div class="c-badge s-ok">✓ Healthy</div></div>
+          <div class="mock-divider"></div>
+          <div class="ai-insight"><div class="ai-insight-label">ORAI AI Insight</div><p>TechCorp mentioned "API latency" 3× in the last call. Sentiment score dropped 22 points. Follow-up email sent. Escalated to Dev team.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ANALYTICS -->
+<section id="analytics">
+  <div class="container">
+    <div class="label reveal" data-index="06">Performance Intelligence</div>
+    <h2 class="section-title reveal d1">Real-Time Analytics &amp;<br><span class="g">Operational Insights</span></h2>
+    <div class="metrics-grid reveal d2">
+      <div class="metric-card"><div class="m-label">Avg Sentiment Score</div><div class="m-value">8.4</div><div class="m-change up">↑ +0.6 this month</div></div>
+      <div class="metric-card"><div class="m-label">Issues Resolved</div><div class="m-value">94%</div><div class="m-change up">↑ +8% vs Q3</div></div>
+      <div class="metric-card"><div class="m-label">Calls Completed</div><div class="m-value">3.2K</div><div class="m-change up">↑ +312 this week</div></div>
+      <div class="metric-card"><div class="m-label">At-Risk Clients</div><div class="m-value">7</div><div class="m-change down">↓ −3 from last week</div></div>
+    </div>
+    <div class="chart-wrap reveal d3">
+      <div class="chart-head">
+        <div class="chart-title">Sentiment Trends — Last 6 Months</div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Satisfaction</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--cyan);opacity:0.6"></div>Issue Rate</div>
+        </div>
+      </div>
+      <div class="bars-container" id="bars-container"></div>
+    </div>
+  </div>
+</section>
+
+<!-- SECURITY -->
+<section id="security">
+  <div class="container">
+    <div style="text-align:center;max-width:600px;margin:0 auto">
+      <div class="label reveal" style="justify-content:center" data-index="07">Trust &amp; Security</div>
+      <h2 class="section-title reveal d1" style="text-align:center">Enterprise-Grade<br><span class="g">Infrastructure</span></h2>
+      <p class="section-body reveal d2" style="margin:0 auto;text-align:center">Built for the reliability and security standards that enterprise organizations demand.</p>
+    </div>
+    <div class="sec-grid reveal d2">
+      <div class="sec-card"><span class="sec-icon">🔐</span><div class="sec-title">Encrypted Communications</div><div class="sec-desc">All voice data and transcripts are encrypted in transit and at rest. Enterprise-level data protection at every layer.</div></div>
+      <div class="sec-card"><span class="sec-icon">🛡️</span><div class="sec-title">Role-Based Access Control</div><div class="sec-desc">Granular permission management ensures team members access only what they need. Full audit logging included.</div></div>
+      <div class="sec-card"><span class="sec-icon">☁️</span><div class="sec-title">Scalable Cloud Architecture</div><div class="sec-desc">Built on enterprise cloud infrastructure designed to scale with your business — from 10 clients to 10,000.</div></div>
+      <div class="sec-card"><span class="sec-icon">📋</span><div class="sec-title">Compliance Ready</div><div class="sec-desc">Designed with compliance requirements in mind. Full data residency controls and privacy-first architecture.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section id="cta">
+  <div class="container">
+    <div class="cta-wrap">
+      <div class="cta-glow"></div>
+      <div class="label reveal" style="justify-content:center" data-index="">Get Started</div>
+      <h2 class="cta-h2 reveal d1">Transform Your<br><span class="g">Customer Operations</span></h2>
+      <p class="cta-sub reveal d2">See how ORAI's AI Voice Agent can automate client health checks, detect issues in real time, and give your team the insights they need to retain and grow accounts.</p>
+      <div class="cta-btns reveal d3">
+        <a href="#" class="btn-primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Book a Demo</a>
+        <a href="#features" class="btn-outline">Explore Platform →</a>
+      </div>
+      <div class="cta-trust reveal d4">
+        <div class="trust-item">No setup fee</div>
+        <div class="trust-item">Enterprise SLA</div>
+        <div class="trust-item">Dedicated onboarding</div>
+        <div class="trust-item">English &amp; Hindi support</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-grid">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="logo-name" style="font-family:var(--font-d);font-size:22px;font-weight:700;letter-spacing:0.12em"><span style="color:var(--blue)">ORAI</span> ROBOTICS</div>
+        <p>AI-powered customer operations infrastructure for modern service businesses. Automate. Analyze. Act.</p>
+        <div style="display:flex;gap:10px;margin-top:20px">
+          <a href="#" style="width:34px;height:34px;border-radius:4px;background:var(--black-3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--white-4);font-size:14px;text-decoration:none;transition:all 0.3s" onmouseover="this.style.borderColor='#2979ff';this.style.color='#2979ff';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='';this.style.color='';this.style.transform=''">𝕏</a>
+          <a href="#" style="width:34px;height:34px;border-radius:4px;background:var(--black-3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--white-4);font-size:12px;font-family:var(--font-m);text-decoration:none;transition:all 0.3s" onmouseover="this.style.borderColor='#2979ff';this.style.color='#2979ff';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='';this.style.color='';this.style.transform=''">in</a>
+        </div>
+      </div>
+      <div class="footer-col"><h4>Platform</h4><a href="#features">AI Voice Agent</a><a href="#features">Health Checks</a><a href="#analytics">Analytics</a><a href="#workspace">Team Workspace</a><a href="#security">Security</a></div>
+      <div class="footer-col"><h4>Solutions</h4><a href="#usecases">SaaS Companies</a><a href="#usecases">API Providers</a><a href="#usecases">Automation Agencies</a><a href="#usecases">MSPs</a><a href="#usecases">Support Teams</a></div>
+      <div class="footer-col"><h4>Company</h4><a href="#">About ORAI</a><a href="#">Careers</a><a href="#">Blog</a><a href="#cta">Contact</a><a href="#cta">Request Demo</a></div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-copy">© 2025 ORAI Robotics. All rights reserved.</div>
+      <div class="footer-links"><a href="#">Privacy Policy</a><a href="#">Terms of Service</a><a href="#">Cookie Policy</a></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ===== CURSOR TRAIL ===== */
+(function(){
+  const c=document.getElementById('cursor-trail');
+  const ctx=c.getContext('2d');
+  c.width=window.innerWidth;c.height=window.innerHeight;
+  window.addEventListener('resize',()=>{c.width=window.innerWidth;c.height=window.innerHeight});
+  const pts=[];
+  let mx=0,my=0;
+  document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;pts.push({x:mx,y:my,life:1,r:2+Math.random()*2})});
+  function loop(){
+    ctx.clearRect(0,0,c.width,c.height);
+    for(let i=pts.length-1;i>=0;i--){
+      const p=pts[i];
+      p.life-=0.04;
+      if(p.life<=0){pts.splice(i,1);continue}
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);
+      ctx.fillStyle=`rgba(41,121,255,${p.life*0.4})`;
+      ctx.fill();
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+/* ===== 3D HERO SCENE ===== */
+(function(){
+  const canvas=document.getElementById('agent-canvas');
+  const hero=document.getElementById('hero');
+  function resize(){
+    canvas.width=hero.clientWidth;
+    canvas.height=hero.clientHeight;
+    camera.aspect=canvas.width/canvas.height;
+    camera.updateProjectionMatrix();
+    renderer.setSize(canvas.width,canvas.height);
+  }
+
+  const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(hero.clientWidth,hero.clientHeight);
+
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(55,hero.clientWidth/hero.clientHeight,0.1,1000);
+  camera.position.set(0,0,28);
+
+  /* Lights */
+  const blueLight=new THREE.PointLight(0x2979ff,5,80);
+  blueLight.position.set(6,6,12);scene.add(blueLight);
+  const cyanLight=new THREE.PointLight(0x00d4ff,3,50);
+  cyanLight.position.set(-8,-4,8);scene.add(cyanLight);
+  const fillLight=new THREE.PointLight(0x1a3a8f,2,60);
+  fillLight.position.set(0,-10,5);scene.add(fillLight);
+  scene.add(new THREE.AmbientLight(0x050a1a,1.5));
+
+  /* Core sphere */
+  const coreG=new THREE.SphereGeometry(3.8,80,80);
+  const coreM=new THREE.MeshStandardMaterial({color:0x030818,emissive:0x0a2cff,emissiveIntensity:0.1,roughness:0.2,metalness:0.95});
+  const core=new THREE.Mesh(coreG,coreM);scene.add(core);
+
+  /* Wireframe overlay */
+  const wG=new THREE.SphereGeometry(3.85,28,28);
+  const wM=new THREE.MeshBasicMaterial({color:0x2979ff,wireframe:true,transparent:true,opacity:0.07});
+  scene.add(new THREE.Mesh(wG,wM));
+
+  /* Icosahedron core */
+  const icoG=new THREE.IcosahedronGeometry(2.4,1);
+  const icoM=new THREE.MeshStandardMaterial({color:0x0a1f6e,emissive:0x1a5fff,emissiveIntensity:0.3,roughness:0.1,metalness:0.98,transparent:true,opacity:0.8});
+  const ico=new THREE.Mesh(icoG,icoM);scene.add(ico);
+
+  /* Rings */
+  function makeRing(r,tube,col,op){
+    const g=new THREE.TorusGeometry(r,tube,8,140);
+    const m=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:op});
+    return new THREE.Mesh(g,m);
+  }
+  const r1=makeRing(5.8,0.028,0x2979ff,0.6);r1.rotation.x=Math.PI*0.3;scene.add(r1);
+  const r2=makeRing(7.4,0.02,0x00d4ff,0.35);r2.rotation.x=Math.PI*0.5;r2.rotation.y=Math.PI*0.25;scene.add(r2);
+  const r3=makeRing(9.2,0.014,0x2979ff,0.18);r3.rotation.x=Math.PI*0.1;r3.rotation.z=Math.PI*0.2;scene.add(r3);
+  const r4=makeRing(4.2,0.04,0x4d9aff,0.4);scene.add(r4);
+
+  /* Orbiting nodes */
+  const nodeMat=new THREE.MeshStandardMaterial({color:0x2979ff,emissive:0x2979ff,emissiveIntensity:1.5,roughness:0.05,metalness:0.9});
+  const cyanNodeMat=new THREE.MeshStandardMaterial({color:0x00d4ff,emissive:0x00d4ff,emissiveIntensity:1.5,roughness:0.05,metalness:0.9});
+  const nodeData=[
+    {r:5.8,spd:0.009,off:0,mat:nodeMat},
+    {r:5.8,spd:0.009,off:Math.PI*0.66,mat:cyanNodeMat},
+    {r:5.8,spd:0.009,off:Math.PI*1.33,mat:nodeMat},
+    {r:7.4,spd:-0.006,off:0,mat:cyanNodeMat},
+    {r:7.4,spd:-0.006,off:Math.PI,mat:nodeMat},
+    {r:4.2,spd:0.013,off:Math.PI*0.5,mat:cyanNodeMat},
+  ];
+  const nodes=nodeData.map(d=>{
+    const g=new THREE.SphereGeometry(0.16,16,16);
+    const m=new THREE.Mesh(g,d.mat);scene.add(m);
+    return{m,...d,ang:d.off};
+  });
+
+  /* Glow halos on nodes */
+  nodes.forEach(n=>{
+    const g=new THREE.SphereGeometry(0.32,8,8);
+    const mat=new THREE.MeshBasicMaterial({color:n.mat===cyanNodeMat?0x00d4ff:0x2979ff,transparent:true,opacity:0.12});
+    const halo=new THREE.Mesh(g,mat);n.m.add(halo);
+  });
+
+  /* Data streams */
+  const streamGrp=new THREE.Group();scene.add(streamGrp);
+  for(let i=0;i<10;i++){
+    const pts=[];
+    const startA=i*Math.PI/5;
+    for(let j=0;j<=50;j++){
+      const t=j/50;
+      const r=3.9+t*7;
+      const a=startA+t*Math.PI*0.6;
+      pts.push(new THREE.Vector3(Math.cos(a)*r,(Math.random()-0.5)*2.5*t,Math.sin(a)*r*0.5));
+    }
+    const g=new THREE.BufferGeometry().setFromPoints(pts);
+    const m=new THREE.LineBasicMaterial({color:i%2===0?0x2979ff:0x00d4ff,transparent:true,opacity:0.06+Math.random()*0.07});
+    streamGrp.add(new THREE.Line(g,m));
+  }
+
+  /* Particles */
+  const pCount=2500;
+  const pG=new THREE.BufferGeometry();
+  const pPos=new Float32Array(pCount*3);
+  const pCol=new Float32Array(pCount*3);
+  for(let i=0;i<pCount;i++){
+    const r=12+Math.random()*35;
+    const th=Math.random()*Math.PI*2;
+    const ph=Math.acos(2*Math.random()-1);
+    pPos[i*3]=r*Math.sin(ph)*Math.cos(th);
+    pPos[i*3+1]=r*Math.sin(ph)*Math.sin(th);
+    pPos[i*3+2]=r*Math.cos(ph);
+    if(Math.random()<0.65){pCol[i*3]=0.16;pCol[i*3+1]=0.47;pCol[i*3+2]=1}
+    else{pCol[i*3]=0;pCol[i*3+1]=0.83;pCol[i*3+2]=1}
+  }
+  pG.setAttribute('position',new THREE.BufferAttribute(pPos,3));
+  pG.setAttribute('color',new THREE.BufferAttribute(pCol,3));
+  const pM=new THREE.PointsMaterial({size:0.07,vertexColors:true,transparent:true,opacity:0.6});
+  const particles=new THREE.Points(pG,pM);scene.add(particles);
+
+  /* Hexagonal grid plane */
+  const gridG=new THREE.PlaneGeometry(60,60,30,30);
+  const gridM=new THREE.MeshBasicMaterial({color:0x2979ff,wireframe:true,transparent:true,opacity:0.03});
+  const grid=new THREE.Mesh(gridG,gridM);
+  grid.rotation.x=-Math.PI/2;grid.position.y=-15;scene.add(grid);
+
+  let mx2=0,my2=0;
+  document.addEventListener('mousemove',e=>{mx2=(e.clientX/window.innerWidth-0.5)*2;my2=(e.clientY/window.innerHeight-0.5)*2});
+
+  let t=0;
+  function animate(){
+    requestAnimationFrame(animate);
+    t+=0.013;
+
+    core.rotation.y=t*0.07;core.rotation.x=t*0.03;
+    ico.rotation.x=t*0.18;ico.rotation.y=t*0.22;
+    const pulse=0.88+Math.sin(t*2.8)*0.1;
+    ico.scale.setScalar(pulse);
+    icoM.emissiveIntensity=0.25+Math.sin(t*3.2)*0.15;
+
+    r1.rotation.z=t*0.28;
+    r2.rotation.y=t*0.2;
+    r3.rotation.x=Math.sin(t*0.3)*0.5;r3.rotation.z=-t*0.14;
+    r4.rotation.z=-t*0.35;r4.rotation.x=Math.sin(t*0.5)*0.3;
+
+    nodes.forEach((n,i)=>{
+      n.ang+=n.spd;
+      if(i<3){
+        n.m.position.set(Math.cos(n.ang)*n.r,Math.sin(n.ang)*n.r*0.35,Math.sin(n.ang)*n.r*0.9);
+      } else if(i<5){
+        n.m.position.set(Math.cos(n.ang)*n.r,Math.sin(n.ang)*n.r*0.5,Math.cos(n.ang*1.2)*2.5);
+      } else {
+        n.m.position.set(Math.cos(n.ang)*n.r,Math.sin(n.ang*2)*1.5,Math.sin(n.ang)*n.r);
+      }
+    });
+
+    streamGrp.rotation.y=t*0.05;
+    particles.rotation.y=t*0.014;
+    particles.rotation.x=t*0.004;
+
+    blueLight.intensity=4+Math.sin(t*2.5)*2;
+    cyanLight.intensity=2.5+Math.cos(t*1.8)*1.2;
+
+    camera.position.x+=(mx2*5-camera.position.x)*0.035;
+    camera.position.y+=(-my2*3-camera.position.y)*0.035;
+    camera.lookAt(0,0,0);
+
+    renderer.render(scene,camera);
+  }
+  animate();
+  window.addEventListener('resize',resize);
+})();
+
+/* ===== NAV SCROLL ===== */
+window.addEventListener('scroll',()=>{document.getElementById('nav').classList.toggle('scrolled',scrollY>50)});
+
+/* ===== REVEAL ===== */
+const obs=new IntersectionObserver(e=>e.forEach(x=>{if(x.isIntersecting)x.target.classList.add('in')}),{threshold:0.1,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+/* ===== BARS ===== */
+(function(){
+  const months=['Jul','Aug','Sep','Oct','Nov','Dec'];
+  const aD=[72,68,80,76,88,92];const bD=[28,34,22,30,18,12];
+  const c=document.getElementById('bars-container');if(!c)return;
+  let html='';
+  months.forEach((m,i)=>{
+    const aH=Math.round((aD[i]/100)*150);const bH=Math.round((bD[i]/100)*150);
+    html+=`<div class="bar-month"><div class="bar-group"><div class="bar bar-a" style="height:${aH}px" title="Satisfaction: ${aD[i]}%"></div><div class="bar bar-b" style="height:${bH}px" title="Issue rate: ${bD[i]}%"></div></div><div class="bar-lbl">${m}</div></div>`;
+  });
+  c.innerHTML=html;
+})();
+
+/* ===== USE CARD MOUSE GLOW ===== */
+document.querySelectorAll('.use-card').forEach(card=>{
+  card.addEventListener('mousemove',e=>{
+    const r=card.getBoundingClientRect();
+    card.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%');
+    card.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%');
+  });
+});
+
+/* ===== FEAT CARD MOUSE GLOW ===== */
+document.querySelectorAll('.feat-card').forEach(card=>{
+  card.addEventListener('mousemove',e=>{
+    const r=card.getBoundingClientRect();
+    const x=((e.clientX-r.left)/r.width)*100;
+    const y=((e.clientY-r.top)/r.height)*100;
+    card.style.background=`radial-gradient(circle at ${x}% ${y}%,rgba(41,121,255,0.09),var(--black) 55%)`;
+  });
+  card.addEventListener('mouseleave',()=>{card.style.background=''});
+});
+
+/* ===== MAGNETIC BUTTONS ===== */
+document.querySelectorAll('.btn-primary,.btn-outline,.nav-cta').forEach(btn=>{
+  btn.addEventListener('mousemove',e=>{
+    const r=btn.getBoundingClientRect();
+    const dx=(e.clientX-r.left-r.width/2)*0.18;
+    const dy=(e.clientY-r.top-r.height/2)*0.18;
+    btn.style.transform=`translate(${dx}px,${dy}px) translateY(-2px)`;
+  });
+  btn.addEventListener('mouseleave',()=>{btn.style.transform=''});
+});
+
+/* ===== COUNTER ANIMATION ===== */
+document.querySelectorAll('.stat-n,.m-value').forEach(el=>{
+  const txt=el.textContent;
+  const num=parseFloat(txt.replace(/[^0-9.]/g,''));
+  if(isNaN(num))return;
+  const obs2=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        let s=0;const dur=1500;const step=16;
+        const inc=num/(dur/step);
+        const ti=setInterval(()=>{
+          s+=inc;if(s>=num){s=num;clearInterval(ti)}
+          const prefix=txt.replace(/[\d.]+/,'');
+          el.textContent=txt.startsWith('<')?txt:txt.replace(/[\d.]+/,s%1===0?Math.round(s):s.toFixed(1));
+        },step);
+        obs2.unobserve(el);
+      }
+    });
+  },{threshold:0.5});
+  obs2.observe(el);
+});
+
+/* ===== TICKER CLONE ===== */
+(function(){
+  const t=document.getElementById('ticker');
+  if(t){const c=t.cloneNode(true);c.removeAttribute('id');t.parentElement.appendChild(c)}
+})();
+</script>
+</body>
+</html>

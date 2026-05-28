@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getStats } from '../api/clientApi';
 import { getQueueStats } from '../api/callApi';
 import QueueHealth from '../components/QueueHealth';
+import ExecutionOverview from '../components/ExecutionOverview';
 
 function AnimatedCounter({ value, duration = 1000 }) {
   const [display, setDisplay] = useState(0);
@@ -226,14 +227,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-border-primary p-8 shadow-sm">
-          <h3 className="text-sm font-semibold text-text-secondary uppercase tracking-wider mb-6">Execution Overview</h3>
-          <div className="space-y-6">
-            <p className="text-xs text-text-tertiary leading-relaxed">
-              Platform is operating within normal parameters. Real-time stats reflect calls processed in the current session.
-            </p>
-          </div>
-        </div>
+        <ExecutionOverview theme={theme} />
       </div>
     </div>
   );

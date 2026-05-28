@@ -6,6 +6,7 @@ import ScheduledCalls from './pages/ScheduledCalls';
 import Calls from './pages/Calls';
 import CallLogs from './pages/CallLogs';
 import LiveActivity from './pages/LiveActivity';
+import Emails from './pages/Emails';
 import Login from './pages/Login';
 import VerifyOtp from './pages/VerifyOtp';
 import SupportTeam from './pages/SupportTeam';
@@ -33,6 +34,7 @@ function App() {
             <Route path="calls" element={<Calls />} />
             <Route path="messages" element={<Messages />} />
             <Route path="logs" element={<LiveActivity />} />
+            <Route path="emails" element={<Emails />} />
             <Route path="support-team" element={<SupportTeam />} />
             <Route path="support-team/:id" element={<SupportMemberProfile />} />
           </Route>

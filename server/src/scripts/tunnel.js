@@ -37,6 +37,7 @@ async function start() {
     if (staticDomain && (staticDomain.includes('ngrok-free.app') || staticDomain.includes('ngrok-free.dev'))) {
       console.log(`💎 Using Static Domain: ${staticDomain}`);
       args.push('--domain=' + staticDomain);
+      args.push('--pooling-enabled');
     }
 
     const ngrokProcess = spawn(NGROK_BIN, args, { detached: false });
@@ -95,7 +96,7 @@ async function start() {
 
     // 4. Start Backend
     console.log('\n🚀 LAUNCHING BACKEND SERVER\n');
-    const server = spawn('npx', ['nodemon', 'src/index.js'], {
+    const server = spawn('node', ['src/index.js'], {
       stdio: 'inherit',
       shell: true,
       cwd: path.join(__dirname, '../..'),

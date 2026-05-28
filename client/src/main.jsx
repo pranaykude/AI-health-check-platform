@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
-const API_BASE = "http://localhost:5001";
+const API_BASE = "";
 
 fetch(API_BASE + "/api/v1/health")
   .then(res => res.json())

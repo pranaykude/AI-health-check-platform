@@ -85,8 +85,7 @@ const VerifyOtp = () => {
           <button
             type="submit"
             disabled={loading || otp.length !== 6}
-            className="w-full flex justify-center items-center py-4 px-6 rounded-2xl text-white font-bold bg-text-primary hover:bg-black transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-lg border-none"
-            style={{ color: '#FFFFFF' }}
+            className="w-full flex justify-center items-center py-4 px-6 rounded-2xl text-white font-bold auth-submit-btn transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-lg border-none"
           >
             {loading ? (
               <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>

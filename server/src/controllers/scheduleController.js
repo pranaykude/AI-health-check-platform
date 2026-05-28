@@ -25,9 +25,13 @@ exports.createSchedule = async (req, res) => {
     const [year, month, day] = date.split('-');
     const [hour, minute] = time.split(':');
     const scheduledAt = new Date(year, month - 1, day, hour, minute);
+    scheduledAt.setSeconds(0, 0);
 
-    if (scheduledAt < new Date()) {
-      return sendError(res, 'Scheduled time must be in the future', 400);
+    const now = new Date();
+    const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0);
+
+    if (scheduledAt < currentMinute) {
+      return sendError(res, 'Scheduled time must be in the future or current minute', 400);
     }
 
     const schedule = await ScheduledCall.create({
@@ -80,9 +84,13 @@ exports.updateSchedule = async (req, res) => {
       const [year, month, day] = date.split('-');
       const [hour, minute] = time.split(':');
       updateData.scheduledAt = new Date(year, month - 1, day, hour, minute);
+      updateData.scheduledAt.setSeconds(0, 0);
       
-      if (updateData.scheduledAt < new Date()) {
-        return sendError(res, 'Scheduled time must be in the future', 400);
+      const now = new Date();
+      const currentMinute = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes(), 0, 0);
+
+      if (updateData.scheduledAt < currentMinute) {
+        return sendError(res, 'Scheduled time must be in the future or current minute', 400);
       }
     }
     

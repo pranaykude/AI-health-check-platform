@@ -353,7 +353,10 @@ const Messages = () => {
           </div>
 
           {/* Premium Chat Container */}
-          <div className="flex-1 px-4 sm:px-8 py-6 overflow-y-auto bg-bg-primary flex flex-col gap-3 relative">
+          <div 
+            className="flex-1 px-4 sm:px-8 py-6 overflow-y-auto flex flex-col gap-3 relative" 
+            style={{ backgroundColor: '#ECE5DD', backgroundImage: 'radial-gradient(#d7ccc0 1px, transparent 1px)', backgroundSize: '20px 20px' }}
+          >
             
             {/* End-to-End Encryption / 24h Window Badge */}
             <div className="mx-auto flex flex-col items-center gap-2 mb-6 animate-fade-in">
@@ -379,15 +382,15 @@ const Messages = () => {
                   className={`flex flex-col max-w-[75%] md:max-w-[65%] ${isOutbound ? 'self-end' : 'self-start'} group`}
                 >
                   {/* Clean Modern Bubble */}
-                  <div className={`px-4 py-2.5 shadow-sm text-sm relative transition-all duration-200 hover:shadow-md ${
+                  <div className={`px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.1)] text-sm relative transition-all duration-200 hover:shadow-md text-[#111B21] ${
                     isOutbound 
-                      ? 'bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl rounded-tr-sm' 
-                      : 'bg-white dark:bg-[#1f2937] text-text-primary rounded-2xl rounded-tl-sm border border-black/5 dark:border-white/5'
+                      ? 'bg-[#DCF8C6] rounded-2xl rounded-tr-sm' 
+                      : 'bg-[#ffffff] rounded-2xl rounded-tl-sm'
                   }`}>
                     <div className="flex flex-col gap-1">
                       <p className="whitespace-pre-wrap leading-relaxed font-medium text-[14px] md:text-[15px]">{msg.body}</p>
                       
-                      <div className={`flex items-center justify-end gap-1 text-[10px] font-medium ${isOutbound ? 'text-green-100' : 'text-text-tertiary'}`}>
+                      <div className="flex items-center justify-end gap-1 text-[10px] font-medium text-[#667781] mt-1">
                         <span>{formatTime(msg.createdAt)}</span>
                         {isOutbound && (
                           <span className="inline-flex items-center ml-0.5">
@@ -431,7 +434,7 @@ const Messages = () => {
           </div>
 
           {/* Premium Modern Message Input Bar */}
-          <div className="p-3 border-t border-border-color bg-bg-secondary relative z-10">
+          <div className="p-3 border-t bg-[#ffffff] relative z-10" style={{ borderTop: '1px solid #E9EDEF' }}>
             <form onSubmit={handleSendMessage} className="flex gap-2 sm:gap-3 items-end max-w-5xl mx-auto">
               
               {/* Attachment / Action Icons */}
@@ -449,13 +452,13 @@ const Messages = () => {
               </div>
 
               {/* Input Bubble */}
-              <div className="flex-1 bg-white dark:bg-[#1f2937] border border-border-color rounded-3xl flex items-center shadow-sm focus-within:ring-2 focus-within:ring-green-500/30 focus-within:border-green-500 transition-all overflow-hidden min-h-[48px]">
+              <div className="flex-1 bg-[#F0F2F5] border-[1.5px] border-transparent rounded-3xl flex items-center shadow-sm focus-within:bg-[#ffffff] focus-within:border-[#25D366] transition-all overflow-hidden min-h-[48px]">
                 <input
                   type="text"
                   placeholder="Type a message..."
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  className="w-full bg-transparent border-none px-5 py-3 text-[15px] placeholder-text-tertiary focus:outline-none focus:ring-0 text-text-primary"
+                  className="w-full bg-transparent border-none px-5 py-3 text-[15px] placeholder-[#8696A0] focus:outline-none focus:ring-0 text-[#111B21]"
                 />
               </div>
 
@@ -463,7 +466,7 @@ const Messages = () => {
               <button
                 type="submit"
                 disabled={isSending || !inputText.trim()}
-                className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:scale-100 flex-shrink-0 mb-0.5"
+                className="w-12 h-12 rounded-full bg-[#128C7E] hover:bg-[#25D366] text-white flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 active:scale-95 disabled:opacity-40 disabled:scale-100 flex-shrink-0 mb-0.5"
                 title="Send via WhatsApp"
               >
                 <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -481,7 +484,7 @@ const Messages = () => {
               <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.739-1.45L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.965C16.528 2.016 14.062.99 11.433.99c-5.442 0-9.866 4.372-9.87 9.802 0 1.634.43 3.23 1.246 4.634L1.874 20.89l5.59-1.466z"/>
             </svg>
           </div>
-          <h3 className="text-xl font-bold text-text-primary mb-2">WhatsApp Unified Two-Way Chat</h3>
+          <h3 className="text-xl font-bold text-text-primary mb-2">ORAI Robotics Unified Two-Way Chat</h3>
           <p className="text-text-secondary text-sm max-w-sm">
             Select a client conversation from the left sidebar panel to manage messages, view real-time delivery status, and coordinate client success flows.
           </p>

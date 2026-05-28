@@ -28,7 +28,6 @@ const WhatsAppConversationSchema = new mongoose.Schema({
   timestamps: true
 });
 
-WhatsAppConversationSchema.index({ client: 1 });
 WhatsAppConversationSchema.index({ whatsappNumber: 1 });
 
 module.exports = mongoose.model('WhatsAppConversation', WhatsAppConversationSchema);

@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config(); // Initialize environment configurations
 console.log("[SAFE MODE] No DB mutation mode enabled");
 const express = require('express');
 const cors = require('cors');
@@ -80,6 +80,7 @@ const jobController = require('./controllers/jobController');
 
 const supportMemberRoutes = require('./routes/supportMemberRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const emailRoutes = require('./routes/emailRoutes');
 
 const scheduleRoutes = require('./routes/scheduleRoutes');
 const whatsappRoutes = require('./routes/whatsappRoutes');
@@ -94,6 +95,7 @@ app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/whatsapp', whatsappRoutes);
 app.use('/webhook/whatsapp', whatsappRoutes);
 app.use('/api/v1/schedules', scheduleRoutes);
+app.use('/api/v1/emails', emailRoutes);
 app.get('/api/v1/metrics', jobController.getMetrics);
 
 // Compatibility route for Frontend Dashboard health checks

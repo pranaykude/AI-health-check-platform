@@ -60,6 +60,15 @@ const navItems = [
     ),
   },
   {
+    to: '/emails',
+    label: 'Emails',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
     to: '/support-team',
     label: 'Support Team',
     icon: (
@@ -185,6 +194,36 @@ export default function Layout() {
       <main className="flex-1 overflow-y-auto bg-bg-secondary">
         <Outlet />
       </main>
+
+      {/* Floating 3D Website Icon */}
+      <div className="fixed bottom-6 right-6 z-50 group">
+        <a
+          href="/landing.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center w-14 h-14 rounded-full bg-slate-900 border border-blue-500/30 text-blue-500 hover:text-blue-400 hover:border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.15)] hover:shadow-[0_0_25px_rgba(37,99,235,0.35)] transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md relative overflow-hidden"
+        >
+          {/* Glowing pulse rings */}
+          <span className="absolute inset-0 rounded-full border border-blue-500/20 animate-ping opacity-75"></span>
+          
+          {/* 3D-like spinning inner globe */}
+          <svg
+            className="w-7 h-7 transform group-hover:rotate-[360deg] transition-transform duration-1000 ease-in-out"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <circle cx="12" cy="12" r="10" strokeWidth={1.5} />
+            <path strokeWidth={1.2} d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
+            <path strokeWidth={1.2} d="M2 12h20" />
+          </svg>
+        </a>
+        
+        {/* Tooltip */}
+        <div className="absolute right-16 bottom-3.5 whitespace-nowrap bg-slate-950/90 border border-blue-500/20 text-blue-400 text-xs font-semibold px-3 py-2 rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:translate-x-0 translate-x-2 transition-all duration-200 shadow-lg font-mono">
+          Launch 3D Website
+        </div>
+      </div>
     </div>
   );
 }

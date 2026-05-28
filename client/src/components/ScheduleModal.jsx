@@ -9,6 +9,14 @@ export default function ScheduleModal({ isOpen, onClose, onConfirm, clientName }
 
   if (!isOpen) return null;
 
+  const getLocalDateString = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onConfirm({ callType, date, time, recurrence, note });
@@ -59,7 +67,7 @@ export default function ScheduleModal({ isOpen, onClose, onConfirm, clientName }
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={getLocalDateString()}
                 className="w-full bg-bg-secondary border border-border-primary rounded-xl px-4 py-2.5 text-text-primary focus:outline-none focus:border-primary-500"
                 required
               />
